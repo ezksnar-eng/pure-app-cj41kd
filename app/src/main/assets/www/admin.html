@@ -43,12 +43,7 @@
   <div class="sub">هذي أداة منفصلة عن التطبيق الرئيسي، تضيف مواقع وتتابع مهام استيرادها لمكتبة بيور المشتركة.</div>
 
   <div class="warn-box">
-    ⚠️ بشكله الحالي، ما فيه أي موقع مفعّل فعلياً — قائمة "المهايئات" بالأسفل فاضية غير القالب الفارغ.
-    المهمة تنشأ وتاخذ رقم (Job ID) وتظهر بقائمة المهام تماماً متل ما تريد، بس تفشل برسالة واضحة
-    لأنه ما مكتوب كود قراءة خاص بأي موقع بعد. هذا الجزء (adapters/) تكتبونه انت وGemini —
-    راجع adapters/_template.js وملف GEMINI_BRIEFING.md لتعرف شلون. كل شي غيره شغّال 100%:
-    تسجيل مواقع بلا حد أقصى لعددها، استيراد تراكمي (يتجاوز الأعمال المستوردة سابقاً ويجيب بس الجديد
-    بكل مرة تضغط "استورد الجديد")، قائمة انتظار، تقدم حي، وحفظ فعلي بالمكتبة المشتركة.
+    ⚠️ يتم الآن استيراد البيانات عبر المهايئات المحدثة (Olympus, MangaLik, Azora) ومعالجة الفهرسة وحفظ المعلومات الوصفية بشكل كامل في مكتبة بيور المشتركة.
   </div>
 
   <div class="card">
@@ -72,11 +67,15 @@
 <script src="queue.js"></script>
 <script src="sites.js"></script>
 <script src="adapters/_template.js"></script>
+<script src="adapters/all-adapters.js"></script>
 <script src="worker.js"></script>
 <script>
   // سجل المهايئات المتوفرة — أضف مهايئك هنا بعد ما تكتبه وتحمّله بـ <script> فوك
   const ADAPTERS = {
     template: TemplateAdapter,
+    olympus: OlympusAdapter,
+    mangalik: MangaLikAdapter,
+    azora: AzoraAdapter,
   };
 
   function fillAdapterSelect(){
