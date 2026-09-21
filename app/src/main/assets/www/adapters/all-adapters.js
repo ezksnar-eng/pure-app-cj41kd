@@ -1,17 +1,20 @@
 /* =====================================================================
-   مهايئات السحب المحدثة والمضمونة لتجاوز قيود CORS بالمتصفح
+   مهايئات السحب المحدثة والمربوطة بالسيرفر المحلي (Localhost Proxy)
    ===================================================================== */
 
+// رابط السيرفر المحلي الشغال داخل تطبيق الموبايل على بورت 8080
+const LOCAL_PROXY_URL = 'http://localhost:8080/proxy?url=';
+
 async function fetchHTML(url) {
-  // استخدام خدمة Corsproxy المباشرة لتجاوز حظر المتصفحات
-  const proxyUrl = 'https://corsproxy.io/?' + encodeURIComponent(url);
   try {
-    const res = await fetch(proxyUrl);
-    if (!res.ok) throw new Error('فشل جلب البيانات');
+    // إرسال الطلب للسيرفر المحلي مع تشفير الرابط
+    const res = await fetch(LOCAL_PROXY_URL + encodeURIComponent(url));
+    if (!res.ok) throw new Error('فشل جلب البيانات من السيرفر المحلي');
     return await res.text();
   } catch (e) {
-    // محاولة ثانية ببروكسي بديل إذا الأول فشل
-    const backupProxy = 'https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent(url);
+    console.error('Fetch Error:', e);
+    // محاولة احتياطية ببروكسي عام إذا كان السيرفر المحلي متوقف
+    const backupProxy = 'https://corsproxy.io/?' + encodeURIComponent(url);
     const res2 = await fetch(backupProxy);
     return await res2.text();
   }
