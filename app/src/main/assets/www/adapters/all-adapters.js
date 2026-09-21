@@ -1,21 +1,22 @@
 /* =====================================================================
-   مهايئات السحب التلقائي والمباشر (Olympus, MangaLik, Azora)
+   مهايئات السحب المحدثة والمضمونة لتجاوز قيود CORS بالمتصفح
    ===================================================================== */
 
-// دالة مساعدة لتجاوز قيود CORS وقراءة الـ HTML من المتصفح
 async function fetchHTML(url) {
+  // استخدام خدمة Corsproxy المباشرة لتجاوز حظر المتصفحات
+  const proxyUrl = 'https://corsproxy.io/?' + encodeURIComponent(url);
   try {
-    const proxyUrl = 'https://api.allorigins.win/raw?url=' + encodeURIComponent(url);
     const res = await fetch(proxyUrl);
-    if (!res.ok) throw new Error('فشل الوصول عبر Proxy');
+    if (!res.ok) throw new Error('فشل جلب البيانات');
     return await res.text();
   } catch (e) {
-    const res = await fetch(url);
-    return await res.text();
+    // محاولة ثانية ببروكسي بديل إذا الأول فشل
+    const backupProxy = 'https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent(url);
+    const res2 = await fetch(backupProxy);
+    return await res2.text();
   }
 }
 
-// دالة تنظيف الرموز والوسوم
 function cleanText(str) {
   if (!str) return '';
   return str
@@ -29,9 +30,7 @@ function cleanText(str) {
     .trim();
 }
 
-/* ================= ================= =================
-   1. مهايئ موقع Olympus
-   ===================================================== */
+/* 1. مهايئ موقع Olympus */
 const OlympusAdapter = {
   id: 'olympus',
   name: 'أوليمبوس (Olympus)',
@@ -60,17 +59,9 @@ const OlympusAdapter = {
     const parser = new DOMParser();
     const doc = parser.parseFromString(html, 'text/html');
 
-    const title =
-      cleanText(doc.querySelector('h1')?.innerText) ||
-      cleanText(doc.querySelector('meta[property="og:title"]')?.content);
-
-    const cover =
-      doc.querySelector('meta[property="og:image"]')?.content ||
-      doc.querySelector('.summary_image img, .thumb img')?.src || '';
-
-    const description =
-      cleanText(doc.querySelector('.entry-content, .synopsis, .manga-excerpt')?.innerText) ||
-      cleanText(doc.querySelector('meta[name="description"]')?.content);
+    const title = cleanText(doc.querySelector('h1')?.innerText) || cleanText(doc.querySelector('meta[property="og:title"]')?.content);
+    const cover = doc.querySelector('meta[property="og:image"]')?.content || doc.querySelector('.summary_image img, .thumb img')?.src || '';
+    const description = cleanText(doc.querySelector('.entry-content, .synopsis, .manga-excerpt')?.innerText) || cleanText(doc.querySelector('meta[name="description"]')?.content);
 
     const genres = [];
     doc.querySelectorAll('a[href*="/genre/"]').forEach((g) => {
@@ -79,7 +70,7 @@ const OlympusAdapter = {
     });
 
     return {
-      title: title.replace(/ - Olympus.*$/i, ''),
+      title: (title || '').replace(/ - Olympus.*$/i, ''),
       cover,
       description,
       genres,
@@ -88,9 +79,7 @@ const OlympusAdapter = {
   },
 };
 
-/* ================= ================= =================
-   2. مهايئ موقع MangaLik
-   ===================================================== */
+/* 2. مهايئ موقع MangaLik */
 const MangaLikAdapter = {
   id: 'mangalik',
   name: 'مانجا ليك (MangaLik)',
@@ -119,17 +108,9 @@ const MangaLikAdapter = {
     const parser = new DOMParser();
     const doc = parser.parseFromString(html, 'text/html');
 
-    const title =
-      cleanText(doc.querySelector('h1')?.innerText) ||
-      cleanText(doc.querySelector('meta[property="og:title"]')?.content);
-
-    const cover =
-      doc.querySelector('meta[property="og:image"]')?.content ||
-      doc.querySelector('.manga-thumbnail img, .summary_image img')?.src || '';
-
-    const description =
-      cleanText(doc.querySelector('.manga-excerpt, .entry-content, .synopsis')?.innerText) ||
-      cleanText(doc.querySelector('meta[name="description"]')?.content);
+    const title = cleanText(doc.querySelector('h1')?.innerText) || cleanText(doc.querySelector('meta[property="og:title"]')?.content);
+    const cover = doc.querySelector('meta[property="og:image"]')?.content || doc.querySelector('.manga-thumbnail img, .summary_image img')?.src || '';
+    const description = cleanText(doc.querySelector('.manga-excerpt, .entry-content, .synopsis')?.innerText) || cleanText(doc.querySelector('meta[name="description"]')?.content);
 
     const genres = [];
     doc.querySelectorAll('a[href*="/genre/"], a[href*="/category/"]').forEach((g) => {
@@ -138,7 +119,7 @@ const MangaLikAdapter = {
     });
 
     return {
-      title: title.replace(/ - MangaLik.*$/i, ''),
+      title: (title || '').replace(/ - MangaLik.*$/i, ''),
       cover,
       description,
       genres,
@@ -147,9 +128,7 @@ const MangaLikAdapter = {
   },
 };
 
-/* ================= ================= =================
-   3. مهايئ موقع Azora
-   ===================================================== */
+/* 3. مهايئ موقع Azora */
 const AzoraAdapter = {
   id: 'azora',
   name: 'أزورا (Azora)',
@@ -178,17 +157,9 @@ const AzoraAdapter = {
     const parser = new DOMParser();
     const doc = parser.parseFromString(html, 'text/html');
 
-    const title =
-      cleanText(doc.querySelector('h1')?.innerText) ||
-      cleanText(doc.querySelector('meta[property="og:title"]')?.content);
-
-    const cover =
-      doc.querySelector('meta[property="og:image"]')?.content ||
-      doc.querySelector('.summary_image img, .thumb img')?.src || '';
-
-    const description =
-      cleanText(doc.querySelector('.entry-content, .synopsis, .manga-excerpt')?.innerText) ||
-      cleanText(doc.querySelector('meta[name="description"]')?.content);
+    const title = cleanText(doc.querySelector('h1')?.innerText) || cleanText(doc.querySelector('meta[property="og:title"]')?.content);
+    const cover = doc.querySelector('meta[property="og:image"]')?.content || doc.querySelector('.summary_image img, .thumb img')?.src || '';
+    const description = cleanText(doc.querySelector('.entry-content, .synopsis, .manga-excerpt')?.innerText) || cleanText(doc.querySelector('meta[name="description"]')?.content);
 
     const genres = [];
     doc.querySelectorAll('a[href*="/genre/"]').forEach((g) => {
@@ -197,7 +168,7 @@ const AzoraAdapter = {
     });
 
     return {
-      title: title.replace(/ - Azora.*$/i, ''),
+      title: (title || '').replace(/ - Azora.*$/i, ''),
       cover,
       description,
       genres,
