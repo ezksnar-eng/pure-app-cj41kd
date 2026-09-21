@@ -6,18 +6,18 @@
 <title>تطبيق سحب بيور — إدارة استيراد المواقع</title>
 <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
   :root{--bg:#0e141c;--card:#1a2331;--border:rgba(255,255,255,.08);--text:#eef2f7;--dim:#93a1b3;--faint:#5d6b7d;--accent:#3d97e8;--danger:#e0555a;--green:#3fbf7f;--warn:#e0b955}
   *{box-sizing:border-box}
   body{margin:0;background:var(--bg);color:var(--text);font-family:'Tajawal',sans-serif;padding:20px;max-width:720px;margin-inline:auto}
   h1{font-size:20px;margin-bottom:4px}
   .sub{color:var(--dim);font-size:13px;margin-bottom:20px;line-height:1.8}
-  .warn-box{background:#3a2c14;border:1px solid #6b5220;color:#f0cf8a;padding:12px 14px;border-radius:10px;font-size:12.5px;line-height:1.9;margin-bottom:20px}
+  .warn-box{background:#1e3228;border:1px solid #2a5a3f;color:#7fe0ab;padding:12px 14px;border-radius:10px;font-size:12.5px;line-height:1.9;margin-bottom:20px}
   .card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:16px}
   label{display:block;font-size:12.5px;color:var(--dim);margin-bottom:5px}
   input,select{width:100%;padding:10px 12px;background:#141c27;border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:14px;margin-bottom:12px;font-family:inherit}
   button{background:var(--accent);color:#fff;border:none;padding:10px 18px;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit}
+  button.success{background:var(--green);color:#fff}
   button.outline{background:transparent;border:1px solid var(--border);color:var(--text)}
   button.danger{background:transparent;border:1px solid var(--danger);color:var(--danger)}
   button:disabled{opacity:.5;cursor:not-allowed}
@@ -34,16 +34,16 @@
   .bar{height:6px;background:#26324356;border-radius:4px;overflow:hidden;margin:8px 0}
   .bar > div{height:100%;background:var(--accent);transition:width .3s}
   .job-msg{font-size:12.5px;color:var(--dim)}
-  .job-actions{display:flex;gap:8px;margin-top:8px}
+  .job-actions{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}
   .empty{text-align:center;color:var(--faint);padding:30px;font-size:13px}
 </style>
 </head>
 <body>
-  <h1>تطبيق سحب بيور — إدارة استيراد المواقع</h1>
-  <div class="sub">هذي أداة منفصلة عن التطبيق الرئيسي، تضيف مواقع وتتابع مهام استيرادها لمكتبة بيور المشتركة.</div>
+  <h1>تطبيق سحب بيور — إدارة استيراد وتصدير المواقع</h1>
+  <div class="sub">أداة استخراج البيانات المباشرة — يتم تصدير النتائج تلقائياً كملف JSON أو نسخها للحافظة بدون الحاجة لقاعدة بيانات.</div>
 
   <div class="warn-box">
-    ⚠️ يتم الآن استيراد البيانات عبر المهايئات المحدثة (Olympus, MangaLik, Azora) ومعالجة الفهرسة وحفظ المعلومات الوصفية بشكل كامل في مكتبة بيور المشتركة.
+    🚀 النظام يعمل الآن بالنمط المباشر (No-DB): سيتم تحميل البيانات المستوردة تلقائياً كملف JSON بمجرد اكتمال السحب!
   </div>
 
   <div class="card">
@@ -59,7 +59,7 @@
   <h3 style="font-size:15px;margin-bottom:10px">المواقع المسجلة (بلا حد أقصى)</h3>
   <div id="sitesList" style="margin-bottom:24px"></div>
 
-  <h3 style="font-size:15px;margin-bottom:10px">المهام</h3>
+  <h3 style="font-size:15px;margin-bottom:10px">المهام والنتائج</h3>
   <div id="jobsList"></div>
 
 <script src="config.js"></script>
@@ -70,7 +70,6 @@
 <script src="adapters/all-adapters.js"></script>
 <script src="worker.js"></script>
 <script>
-  // سجل المهايئات المتوفرة — أضف مهايئك هنا بعد ما تكتبه وتحمّله بـ <script> فوك
   const ADAPTERS = {
     template: TemplateAdapter,
     olympus: OlympusAdapter,
@@ -84,10 +83,22 @@
   }
   fillAdapterSelect();
 
+  function downloadJSON(data, filename) {
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename || 'imported_manga.json';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
   function startImportForSite(site){
     const job = Queue.create({title:site.name, baseUrl:site.url, adapterId:site.adapterId, siteId:site.id});
     renderAll();
-    runImportJob(job.id, ADAPTERS[site.adapterId]); // ما ننتظرها — تشتغل بالخلفية ونتابعها بالبولنگ
+    runImportJob(job.id, ADAPTERS[site.adapterId]);
   }
 
   document.getElementById('startBtn').onclick = ()=>{
@@ -95,7 +106,6 @@
     const url = document.getElementById('siteUrl').value.trim();
     const adapterId = document.getElementById('adapterSelect').value;
     if(!url){ alert('حط رابط الموقع أول'); return; }
-    // إذا الموقع مسجل من قبل بنفس الرابط، نستخدم نفس السجل بدل ما ننشئ وحدة مكررة
     let site = Sites.list().find(s=>s.url===url);
     if(!site) site = Sites.add({name, url, adapterId});
     else Sites.update(site.id, {name, adapterId});
@@ -104,7 +114,7 @@
   };
 
   function statusLabel(s){
-    return {queued:'بالانتظار', running:'قيد التنفيذ', done:'مكتمل', failed:'فشل', canceled:'ملغي'}[s] || s;
+    return {queued:'بالانتظار', running:'قيد التنفيذ', done:'مكتمل والتصدير جاهز', failed:'فشل', canceled:'ملغي'}[s] || s;
   }
   function timeAgo(ts){
     if(!ts) return 'لم يُستورد منه بعد';
@@ -139,7 +149,7 @@
       if(site) startImportForSite(site);
     });
     el.querySelectorAll('[data-delsite]').forEach(b=> b.onclick=()=>{
-      if(confirm('حذف هذا الموقع من القائمة؟ (ما يحذف الأعمال المستوردة سابقاً من المكتبة)')){
+      if(confirm('حذف هذا الموقع من القائمة؟')){
         Sites.remove(b.dataset.delsite); renderAll();
       }
     });
@@ -158,30 +168,52 @@
         <div class="bar"><div style="width:${j.progress||0}%"></div></div>
         <div class="job-msg">${escapeHtml(j.message||'')} ${j.found? `— وُجد ${j.found}`:''}</div>
         <div class="job-actions">
+          ${j.status==='done' && j.results ? `<button class="success" data-download="${j.id}">⬇️ تحميل ملف JSON</button>` : ''}
+          ${j.status==='done' && j.results ? `<button class="outline" data-copy="${j.id}">📋 نسخ البيانات</button>` : ''}
           ${j.status==='running'||j.status==='queued'? `<button class="danger" data-cancel="${j.id}">إلغاء</button>`:''}
           ${j.status!=='running'? `<button class="outline" data-remove="${j.id}">حذف من القائمة</button>`:''}
         </div>
       </div>
     `).join('');
+
+    el.querySelectorAll('[data-download]').forEach(b=> b.onclick=()=>{
+      const job = Queue.list().find(j=>j.id===b.dataset.download);
+      if(job && job.results) downloadJSON(job.results, `${job.title}_data.json`);
+    });
+
+    el.querySelectorAll('[data-copy]').forEach(b=> b.onclick=()=>{
+      const job = Queue.list().find(j=>j.id===b.dataset.copy);
+      if(job && job.results) {
+        navigator.clipboard.writeText(JSON.stringify(job.results, null, 2));
+        alert('تم نسخ البيانات المجلوبة بنجاح!');
+      }
+    });
+
     el.querySelectorAll('[data-cancel]').forEach(b=> b.onclick=()=>{ Queue.update(b.dataset.cancel, {status:'canceled', message:'أُلغيت من المستخدم'}); renderAll(); });
     el.querySelectorAll('[data-remove]').forEach(b=> b.onclick=()=>{ Queue.remove(b.dataset.remove); renderAll(); });
 
-    // نحدّث سجل الموقع لما مهمته تخلص (نجاح أو فشل) — مرة وحدة بس لكل مهمة
     jobs.forEach(j=>{
       if(j.siteId && (j.status==='done'||j.status==='failed') && !j.__siteSynced){
         Sites.update(j.siteId, {lastImportAt: j.updatedAt, lastResult: j.message});
-        j.__siteSynced = true; // علامة محلية بس (ما تُحفظ) لتفادي تحديث مكرر بنفس الجلسة
+        
+        // التصدير التلقائي عند اكتمال المهمة نجاحاً لأول مرة
+        if(j.status === 'done' && j.results && !j.__downloaded) {
+          downloadJSON(j.results, `${j.title}_manga_data.json`);
+          j.__downloaded = true;
+        }
+        j.__siteSynced = true;
       }
     });
   }
+
   function escapeHtml(s){ return (s||'').replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
 
   function renderAll(){ renderSites(); renderJobs(); }
 
   (async function init(){
-    await Store.init();
+    if(window.Store && Store.init) await Store.init();
     renderAll();
-    setInterval(renderAll, 1000); // بولنگ بسيط لتحديث شريط التقدم أثناء اشتغال المهمة
+    setInterval(renderAll, 1000);
   })();
 </script>
 </body>
