@@ -272,9 +272,3 @@ const AzoraAdapter = createAdapter({
   coverSelectors: ['.post-thumbnail img'],
   genreSelectors: ['a[href*="/manga-genre/"]'],
 });
-
-/* لإضافة موقع جديد بسرعة بدون كتابة أي كود تحليل يدوي:
-   const NewSiteAdapter = createAdapter({ id: 'new-site', name: 'اسم الموقع' });
-   ثم سجّله بـ admin.html بنفس طريقة الباقي. إذا احتاج محددات خاصة به
-   (لأن بنية موقعه مختلفة)، مرّرها كـ extra: coverSelectors/descSelectors/
-   genreSelectors/titleSelectors — نفس فكرة MangaLikAdapter و AzoraAdapter فوق. */
