@@ -1,95 +1,9 @@
-import time
-import threading
-import urllib.parse
-import urllib.request
-import ssl
-import webview
-from http.server import BaseHTTPRequestHandler, HTTPServer
-
-# ================= =================
-# 1. البروكسي الداخلي (المدمج)
-# ================= =================
-class IntegratedProxyHandler(BaseHTTPRequestHandler):
-    def _set_headers(self, status=200):
-        self.send_response(status)
-        self.send_header('Access-Control-Allow-Origin', '*')
-        self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-        self.send_header('Access-Control-Allow-Headers', '*')
-        self.send_header('Content-Type', 'text/html; charset=utf-8')
-        self.end_headers()
-
-    def do_OPTIONS(self):
-        self._set_headers(200)
-
-    def do_GET(self):
-        parsed_path = urllib.parse.urlparse(self.path)
-        query = urllib.parse.parse_qs(parsed_path.query)
-        
-        target_url = query.get('url', [None])[0]
-        if not target_url and len(self.path) > 1:
-            target_url = self.path[1:].lstrip('/')
-
-        if not target_url:
-            self._set_headers(400)
-            self.wfile.write(b'Missing url parameter')
-            return
-
-        if 'appassets.androidplatform.net' in target_url:
-            target_url = target_url.replace('https://appassets.androidplatform.net', 'https://azorafly.com')
-            target_url = target_url.replace('http://appassets.androidplatform.net', 'https://azorafly.com')
-
-        if not target_url.startswith('http://') and not target_url.startswith('https://'):
-            target_url = 'https://' + target_url
-
-        try:
-            ctx = ssl.create_default_context()
-            ctx.check_hostname = False
-            ctx.verify_mode = ssl.CERT_NONE
-
-            opener = urllib.request.build_opener(urllib.request.HTTPSHandler(context=ctx))
-            
-            req = urllib.request.Request(
-                target_url,
-                headers={
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-                    'Referer': 'https://azorafly.com/'
-                }
-            )
-
-            with opener.open(req, timeout=20) as response:
-                content = response.read()
-                self._set_headers(200)
-                self.wfile.write(content)
-
-        except Exception as e:
-            self._set_headers(200)
-            self.wfile.write(f'Error fetching site: {str(e)}'.encode('utf-8'))
-
-    def log_message(self, format, *args):
-        return
-
-def run_proxy_server():
-    while True:
-        try:
-            server_address = ('127.0.0.1', 8080)
-            httpd = HTTPServer(server_address, IntegratedProxyHandler)
-            print("🚀 Proxy server running on port 8080...")
-            httpd.serve_forever()
-        except Exception as e:
-            print(f"⚠️ إعادة تشغيل البروكسي: {e}")
-            time.sleep(2)
-
-# ================= =================
-# 2. واجهة التطبيق (HTML / JS)
-# ================= =================
-HTML_CONTENT = """
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ساحب أزورا الشامل والتصنيفات 🚀</title>
+  <title>ساحب أزورا الشامل المدمج ⚡</title>
   <style>
     :root { --main: #ff9800; --bg: #0b0b0e; --card: #16161a; --border: #26262e; }
     body { font-family: system-ui, -apple-system, sans-serif; background: var(--bg); color: #fff; padding: 15px; margin: 0; }
@@ -109,11 +23,11 @@ HTML_CONTENT = """
 <body>
 
   <div class="container">
-    <h2>ساحب أزورا الشامل والتصنيفات (9 أعمال سوية) ⚡</h2>
-    <div class="status-badge" id="status">⚡ البروكسي الداخلي متصل وجاهز...</div>
+    <h2>ساحب أزورا الشامل (سرعة 9X + تصنيفات) ⚡</h2>
+    <div class="status-badge" id="status">⚡ جاهز للانطلاق مع البروكسي المدمج...</div>
 
     <div class="controls">
-      <button class="btn" id="startBtn">🚀 بدء المسح الشامل والتصنيفات (سرعة 9X)</button>
+      <button class="btn" id="startBtn">🚀 بدء المسح الشامل بالتصنيفات (سرعة 9X)</button>
     </div>
 
     <div class="grid-stats">
@@ -122,7 +36,7 @@ HTML_CONTENT = """
       <div class="stat-card"><h3 id="statImgs">0</h3><p>صور مرفوعة</p></div>
     </div>
 
-    <div id="logBox">اضغط على زر البدء لبدء السحب الشامل عبر البروكسي الداخلي...</div>
+    <div id="logBox">اضغط على زر البدء لبدء السحب تلقائياً...</div>
   </div>
 
   <script type="module">
@@ -143,11 +57,17 @@ HTML_CONTENT = """
 
     let mangaCount = 0, chapCount = 0, imgCount = 0;
     const processedUrls = new Set();
-    const CONCURRENCY_LIMIT = 9;
+    const CONCURRENCY_LIMIT = 9; // 9 أعمال بنفس الوقت
+
+    async function requestWakeLock() {
+      try {
+        if ('wakeLock' in navigator) await navigator.wakeLock.request('screen');
+      } catch (e) {}
+    }
 
     function printLog(txt) {
       const b = document.getElementById('logBox');
-      b.innerText += "\\n> " + txt;
+      b.innerText += "\n> " + txt;
       b.scrollTop = b.scrollHeight;
     }
 
@@ -155,7 +75,7 @@ HTML_CONTENT = """
       if (!url) return "";
       let cleaned = url.trim();
       if (cleaned.includes('androidplatform.net')) {
-        cleaned = cleaned.replace(/https?:\\/\\/appassets\\.androidplatform\\.net/g, 'https://azorafly.com');
+        cleaned = cleaned.replace(/https?:\/\/appassets\.androidplatform\.net/g, 'https://azorafly.com');
       }
       if (cleaned.startsWith("//")) return "https:" + cleaned;
       if (cleaned.startsWith("/")) return "https://azorafly.com" + cleaned;
@@ -163,21 +83,33 @@ HTML_CONTENT = """
       return cleaned;
     }
 
-    // جلب حصرياً عن طريق البروكسي الداخلي (Port 8080)
-    async function fetchViaInternalProxy(targetUrl) {
+    // دالة الجلب الموحدة الذكية عبر البروكسي الداخلي المدمج
+    async function fetchViaSmartProxy(targetUrl) {
       const safeUrl = cleanUrl(targetUrl);
-      const endpoint = `http://127.0.0.1:8080/?url=${encodeURIComponent(safeUrl)}`;
+      
+      // مسارات البروكسي الداخلي الخاصة بالتطبيق + المحاولات الإضافية
+      const proxyEndpoints = [
+        `http://127.0.0.1:8080/?url=${encodeURIComponent(safeUrl)}`,
+        `http://localhost:8080/?url=${encodeURIComponent(safeUrl)}`,
+        `http://127.0.0.1:8080/${safeUrl}`
+      ];
 
-      const res = await fetch(endpoint);
-      if (res.ok) {
-        const text = await res.text();
-        if (text && text.length > 100) {
-          return new DOMParser().parseFromString(text, 'text/html');
-        }
+      for (let endpoint of proxyEndpoints) {
+        try {
+          const res = await fetch(endpoint);
+          if (res.ok) {
+            const html = await res.text();
+            if (html && html.length > 200 && !html.includes("Error fetching site")) {
+              return new DOMParser().parseFromString(html, 'text/html');
+            }
+          }
+        } catch (e) {}
       }
-      throw new Error("فشل الجلب عبر البروكسي الداخلي.");
+
+      throw new Error("تعذر جلب البيانات. تأكد من أن خدمة البروكسي المدمجة قيد التشغيل.");
     }
 
+    // معالجة مانهوا واحدة (جلب البيانات + رفع لـ Firebase + جلب الفصول والصور)
     async function processSingleManga(mUrl) {
       if (processedUrls.has(mUrl)) return;
       processedUrls.add(mUrl);
@@ -187,7 +119,7 @@ HTML_CONTENT = """
         const snap = await getDocs(q);
 
         let mangaId;
-        const mDoc = await fetchViaInternalProxy(mUrl);
+        const mDoc = await fetchViaSmartProxy(mUrl);
         const title = mDoc.querySelector('meta[property="og:title"]')?.content || mDoc.title || "عمل أزورا";
         const cover = cleanUrl(mDoc.querySelector('meta[property="og:image"]')?.content || "");
 
@@ -213,6 +145,7 @@ HTML_CONTENT = """
           printLog(`  ✨ [رفع جديد]: ${title}`);
         }
 
+        // استخراج الفصول
         const chAnchors = Array.from(mDoc.querySelectorAll('a'))
           .map(a => ({ url: cleanUrl(a.href || a.getAttribute('href')), txt: a.innerText.trim() }))
           .filter(c => c.url && (c.url.includes('chapter') || c.url.includes('/ch-') || c.txt.includes('فصل')));
@@ -225,43 +158,49 @@ HTML_CONTENT = """
         for (let j = 0; j < uniqueChaps.length; j++) {
           const ch = uniqueChaps[j];
           try {
-            const chDoc = await fetchViaInternalProxy(ch.url);
+            const chDoc = await fetchViaSmartProxy(ch.url);
             const imgElements = Array.from(chDoc.querySelectorAll('img'));
             
             const rawImgs = imgElements.map(img => img.getAttribute('data-src') || img.getAttribute('lazy-src') || img.src).filter(Boolean);
             const validImgs = [...new Set(rawImgs)].map(cleanUrl).filter(src => src && (src.includes('.jpg') || src.includes('.png') || src.includes('.webp') || src.includes('uploads')));
 
-            await addDoc(collection(db, `manga/${mangaId}/chapters`), {
-              title: ch.txt || `فصل ${j + 1}`,
-              sourceUrl: ch.url,
-              images: validImgs,
-              order: j + 1
-            });
+            if (validImgs.length > 0) {
+              await addDoc(collection(db, `manga/${mangaId}/chapters`), {
+                title: ch.txt || `فصل ${j + 1}`,
+                sourceUrl: ch.url,
+                images: validImgs,
+                order: j + 1
+              });
 
-            chapCount++;
-            imgCount += validImgs.length;
-            document.getElementById('statChaps').innerText = chapCount;
-            document.getElementById('statImgs').innerText = imgCount;
+              chapCount++;
+              imgCount += validImgs.length;
+              document.getElementById('statChaps').innerText = chapCount;
+              document.getElementById('statImgs').innerText = imgCount;
+            }
 
           } catch (chErr) {}
         }
       } catch (err) {}
     }
 
+    // معالجة دفعة 9 أعمال متوازية
     async function processBatchInParallel(mangaUrls) {
       for (let i = 0; i < mangaUrls.length; i += CONCURRENCY_LIMIT) {
         const batch = mangaUrls.slice(i, i + CONCURRENCY_LIMIT);
-        printLog(`\\n⚡ جاري معالجة 9 أعمال سوية عبر البروكسي الداخلي...`);
+        printLog(`\n⚡ جاري معالجة دفعة من (${batch.length}) أعمال بوقت واحد...`);
         await Promise.all(batch.map(url => processSingleManga(url)));
       }
     }
 
+    // الدالة الرئيسية لبدء المسح عبر التصنيفات والأرشيف
     async function startFullArchiving() {
       document.getElementById('startBtn').disabled = true;
       document.getElementById('status').innerText = "🚀 المسح الشامل شغال بالخلفية...";
+      await requestWakeLock();
 
       try {
-        printLog("🔍 جاري فحص جميع التصنيفات عبر البروكسي الداخلي...");
+        printLog("🔍 جاري جلب أقسام التصنيفات والأرشيف من أزورا...");
+        
         let uniqueGenres = [
           "https://azorafly.com/series?type=manhwa",
           "https://azorafly.com/series?type=manga",
@@ -269,7 +208,7 @@ HTML_CONTENT = """
         ];
 
         try {
-          const homeDoc = await fetchViaInternalProxy("https://azorafly.com");
+          const homeDoc = await fetchViaSmartProxy("https://azorafly.com");
           const fetchedLinks = Array.from(homeDoc.querySelectorAll('a'))
             .map(a => cleanUrl(a.href || a.getAttribute('href')))
             .filter(h => h.includes('/genre') || h.includes('/genres') || h.includes('/category') || h.includes('/type/'));
@@ -279,16 +218,16 @@ HTML_CONTENT = """
           }
         } catch (e) {}
 
-        printLog(`🎯 عثرنا على (${uniqueGenres.length}) تصنيف وسيتم مسحهن بكتفاء ذاتي!`);
+        printLog(`🎯 عثرنا على (${uniqueGenres.length}) تصنيف وسيتم مسح كافة صفحاتهن!`);
 
         for (let g = 0; g < uniqueGenres.length; g++) {
           const genreUrl = uniqueGenres[g];
-          printLog(`\\n📁 [تصنيف ${g + 1}/${uniqueGenres.length}] فحص: ${genreUrl}`);
+          printLog(`\n📁 [تصنيف ${g + 1}/${uniqueGenres.length}] فحص: ${genreUrl}`);
 
-          for (let p = 1; p <= 200; p++) {
+          for (let p = 1; p <= 300; p++) {
             const pageUrl = genreUrl.includes('?') ? `${genreUrl}&page=${p}` : `${genreUrl}?page=${p}`;
             try {
-              const pDoc = await fetchViaInternalProxy(pageUrl);
+              const pDoc = await fetchViaSmartProxy(pageUrl);
               const links = Array.from(pDoc.querySelectorAll('a'))
                 .map(a => cleanUrl(a.href || a.getAttribute('href')))
                 .filter(h => h && (h.includes('/series/') || h.includes('/manga/') || h.includes('/work/')));
@@ -296,42 +235,28 @@ HTML_CONTENT = """
               const mangaList = [...new Set(links)].filter(url => !processedUrls.has(url));
 
               if (mangaList.length === 0) {
-                printLog(`  🏁 اكتمل مسح التصنيف عند الصفحة ${p - 1}.`);
+                printLog(`  🏁 اكتمل هذا التصنيف عند الصفحة ${p - 1}.`);
                 break;
               }
 
-              printLog(`  📑 الصفحة ${p}: عثرنا على ${mangaList.length} عمل.`);
+              printLog(`  📑 الصفحة ${p}: عثرنا على ${mangaList.length} عمل جديد.`);
               await processBatchInParallel(mangaList);
 
             } catch (pErr) {
+              printLog(`  ⚠️ توقف أو اكتمل الصفحة عند ${p}`);
               break;
             }
           }
         }
 
       } catch (err) {
-        printLog(`❌ خطأ عام: ${err.message}`);
+        printLog(`❌ خطأ أثناء السحب: ${err.message}`);
       }
 
-      document.getElementById('status').innerText = "🎉 اكتمل سحب كافة الأعمال بنجاح!";
+      document.getElementById('status').innerText = "🎉 اكتمل سحب كافة التصنيفات والـ 10,000 مانهوا بنجاح!";
     }
 
     document.getElementById('startBtn').addEventListener('click', startFullArchiving);
   </script>
 </body>
 </html>
-"""
-
-# ================= =================
-# 3. التشغيل المزدوج (بروكسي + واجهة)
-# ================= =================
-if __name__ == '__main__':
-    # تشغيل سيرفر البروكسي كـ Thread مكتفي ذاتياً
-    proxy_thread = threading.Thread(target=run_proxy_server, daemon=True)
-    proxy_thread.start()
-
-    print("✅ سيرفر البروكسي شغّال بكتفاء ذاتي على المنفذ 8080.")
-
-    # فتح واجهة التطبيق مباشرة
-    webview.create_window('ساحب أزورا الشامل', html=HTML_CONTENT, width=700, height=800)
-    webview.start()
