@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ساحب أزورا المباشر - الأرشيف والتصنيفات ⚡</title>
+  <title>ساحب أزورا - سحب الأرشيف بالخلفية (25 عامل) ⚡</title>
   <style>
     :root { --main: #ff9800; --bg: #0b0b0e; --card: #16161a; --border: #26262e; }
     body { font-family: system-ui, -apple-system, sans-serif; background: var(--bg); color: #fff; padding: 15px; margin: 0; }
@@ -23,11 +23,11 @@
 <body>
 
   <div class="container">
-    <h2>ساحب أزورا المباشر (الأرشيف والتصنيفات) ⚡</h2>
-    <div class="status-badge" id="status">⚡ جاهز لسحب الأرشيف والتصنيفات...</div>
+    <h2>ساحب أزورا (الخلفية + مطابقة قاعدة البيانات) ⚡</h2>
+    <div class="status-badge" id="status">⚡ البروكسي والخدمة بالخلفية جاهزة...</div>
 
     <div class="controls">
-      <button class="btn" id="startBtn">🚀 بدء سحب الأرشيف والتصنيفات (25 عامل)</button>
+      <button class="btn" id="startBtn">🚀 بدء سحب الأرشيف الشامل (25 عامل)</button>
     </div>
 
     <div class="grid-stats">
@@ -36,7 +36,7 @@
       <div class="stat-card"><h3 id="statImgs">0</h3><p>صور مرفوعة</p></div>
     </div>
 
-    <div id="logBox">اضغط على زر البدء لبدء السحب المباشر...</div>
+    <div id="logBox">اضغط بدء لتشغيل الـ 25 عامل بالخلفية...</div>
   </div>
 
   <script type="module">
@@ -57,7 +57,7 @@
 
     let mangaCount = 0, chapCount = 0, imgCount = 0;
     const processedUrls = new Set();
-    const CONCURRENCY_LIMIT = 25; // 25 عامل سحب متوازي
+    const CONCURRENCY_LIMIT = 25; // 25 عامل موازي
 
     async function requestWakeLock() {
       try {
@@ -83,68 +83,62 @@
       return cleaned;
     }
 
-    // جلب ذكي ومضمون للبروكسي الداخلي
-    async function fetchViaSmartProxy(targetUrl) {
+    // اتصال بالبروكسي المحلي المشتغل بالخلفية
+    async function fetchViaProxy(targetUrl) {
       const safeUrl = cleanUrl(targetUrl);
-      
-      const proxyEndpoints = [
-        `http://127.0.0.1:8080/?url=${encodeURIComponent(safeUrl)}`,
-        `http://localhost:8080/?url=${encodeURIComponent(safeUrl)}`,
-        `http://127.0.0.1:8080/${safeUrl}`
-      ];
+      const proxyEndpoint = `http://127.0.0.1:8080/?url=${encodeURIComponent(safeUrl)}`;
 
-      for (let endpoint of proxyEndpoints) {
-        try {
-          const res = await fetch(endpoint, { cache: "no-store" });
-          if (res.ok) {
-            const html = await res.text();
-            if (html && html.length > 200 && !html.includes("Error fetching site")) {
-              return new DOMParser().parseFromString(html, 'text/html');
-            }
+      try {
+        const res = await fetch(proxyEndpoint, { cache: "no-store" });
+        if (res.ok) {
+          const html = await res.text();
+          if (html && html.length > 200 && !html.includes("Error fetching site")) {
+            return new DOMParser().parseFromString(html, 'text/html');
           }
-        } catch (e) {}
-      }
+        }
+      } catch (e) {}
 
-      throw new Error("فشل الاتصال بالبروكسي الداخلي.");
+      throw new Error("فشل الاتصال بالبروكسي بالخلفية.");
     }
 
-    // معالجة مانهوا سينغل
+    // معالجة عمل فردي - مع شرط التجاوز إذا كان موجود بقاعدة البيانات
     async function processSingleManga(mUrl) {
       if (processedUrls.has(mUrl)) return;
       processedUrls.add(mUrl);
 
       try {
+        // 1. فحص قاعدة البيانات أولاً
         const q = query(collection(db, "manga"), where("sourceUrl", "==", mUrl));
         const snap = await getDocs(q);
 
-        let mangaId;
-        const mDoc = await fetchViaSmartProxy(mUrl);
+        if (!snap.empty) {
+          printLog(`  ⏭️ [متواجد بقاعدة البيانات - تم التجاوز]: ${mUrl}`);
+          return; // الخروج المباشر وعدم إعادة سحبه أو رفعه
+        }
+
+        // 2. إذا غير موجود، البدء بجلب وتخزين العمل الجديد
+        const mDoc = await fetchViaProxy(mUrl);
         const title = mDoc.querySelector('meta[property="og:title"]')?.content || mDoc.title || "عمل أزورا";
         const cover = cleanUrl(mDoc.querySelector('meta[property="og:image"]')?.content || "");
 
-        if (!snap.empty) {
-          printLog(`  ⚠️ [موجود سابقا]: ${title}`);
-          mangaId = snap.docs[0].id;
-        } else {
-          const docRef = await addDoc(collection(db, "manga"), {
-            title: title,
-            cover: cover,
-            coverUrl: cover,
-            image: cover,
-            sourceUrl: mUrl,
-            sourceSite: "Azora",
-            type: "مانهوا",
-            status: "مستمر",
-            rating: 8.0,
-            createdAt: serverTimestamp()
-          });
-          mangaId = docRef.id;
-          mangaCount++;
-          document.getElementById('statManga').innerText = mangaCount;
-          printLog(`  ✨ [رفع جديد]: ${title}`);
-        }
+        const docRef = await addDoc(collection(db, "manga"), {
+          title: title,
+          cover: cover,
+          coverUrl: cover,
+          image: cover,
+          sourceUrl: mUrl,
+          sourceSite: "Azora",
+          type: "مانهوا",
+          status: "مستمر",
+          rating: 8.0,
+          createdAt: serverTimestamp()
+        });
+        const mangaId = docRef.id;
+        mangaCount++;
+        document.getElementById('statManga').innerText = mangaCount;
+        printLog(`  ✨ [رفع جديد]: ${title}`);
 
-        // استخراج الفصول
+        // 3. استخراج وفحص الفصول
         const chAnchors = Array.from(mDoc.querySelectorAll('a'))
           .map(a => ({ url: cleanUrl(a.href || a.getAttribute('href')), txt: a.innerText.trim() }))
           .filter(c => c.url && (c.url.includes('chapter') || c.url.includes('/ch-') || c.txt.includes('فصل')));
@@ -157,7 +151,7 @@
         for (let j = 0; j < uniqueChaps.length; j++) {
           const ch = uniqueChaps[j];
           try {
-            const chDoc = await fetchViaSmartProxy(ch.url);
+            const chDoc = await fetchViaProxy(ch.url);
             const imgElements = Array.from(chDoc.querySelectorAll('img'));
             
             const rawImgs = imgElements.map(img => img.getAttribute('data-src') || img.getAttribute('lazy-src') || img.src).filter(Boolean);
@@ -182,23 +176,27 @@
       } catch (err) {}
     }
 
-    // معالجة 25 عمل بنفس اللحظة بالتوازي
+    // توزيع 25 عامل بالتوازي
     async function processBatchInParallel(mangaUrls) {
       for (let i = 0; i < mangaUrls.length; i += CONCURRENCY_LIMIT) {
         const batch = mangaUrls.slice(i, i + CONCURRENCY_LIMIT);
-        printLog(`\n⚡ 25 عامل يرفعون (${batch.length}) أعمال بوقت واحد...`);
+        printLog(`\n⚡ 25 عامل يفحصون ويرفعون (${batch.length}) عمل بالتوازي...`);
         await Promise.all(batch.map(url => processSingleManga(url)));
       }
     }
 
-    // مسح رابط الأرشيف أو التصنيف بصفحاته
-    async function processTargetUrl(targetUrl, titleName) {
-      printLog(`\n📁 [بدء سحب]: ${titleName}\n🔗 الرابط: ${targetUrl}`);
+    // سحب صفحات الأرشيف الشامل فقط
+    async function startArchiveScraping() {
+      document.getElementById('startBtn').disabled = true;
+      document.getElementById('status').innerText = "🚀 السحب بالخلفية قيد التشغيل (25 عامل)...";
+      await requestWakeLock();
 
-      for (let p = 1; p <= 300; p++) {
-        const pageUrl = targetUrl.includes('?') ? `${targetUrl}&page=${p}` : `${targetUrl}?page=${p}`;
+      printLog("📁 بدء مسح الأرشيف الشامل: https://azorafly.com/series/");
+
+      for (let p = 1; p <= 500; p++) {
+        const pageUrl = `https://azorafly.com/series/?page=${p}`;
         try {
-          const pDoc = await fetchViaSmartProxy(pageUrl);
+          const pDoc = await fetchViaProxy(pageUrl);
           const links = Array.from(pDoc.querySelectorAll('a'))
             .map(a => cleanUrl(a.href || a.getAttribute('href')))
             .filter(h => h && (h.includes('/series/') || h.includes('/manga/') || h.includes('/work/')) && !h.endsWith('/series/') && !h.includes('genres='));
@@ -206,46 +204,22 @@
           const mangaList = [...new Set(links)].filter(url => !processedUrls.has(url));
 
           if (mangaList.length === 0) {
-            printLog(`  🏁 اكتمل سحب هذا القسم عند الصفحة ${p - 1}.`);
+            printLog(`  🏁 اكتمل سحب كافة صفحات الأرشيف عند الصفحة ${p - 1}.`);
             break;
           }
 
-          printLog(`  📑 الصفحة ${p}: لقينه ${mangaList.length} عمل.`);
+          printLog(`  📑 الصفحة ${p}: عثرنا على ${mangaList.length} عمل.`);
           await processBatchInParallel(mangaList);
 
         } catch (pErr) {
-          printLog(`  ⚠️ تعذر جلب الصفحة ${p}، سيتولى العامل التالي القفز...`);
-          break;
+          printLog(`  ⚠️ إعادة المحاولة أو تخطي الصفحة ${p}...`);
         }
       }
+
+      document.getElementById('status').innerText = "🎉 اكتمل المسح والسحب الشامل بنجاح!";
     }
 
-    // بدء سحب الأرشيف والتصنيفات المباشرة
-    async function startFullArchiving() {
-      document.getElementById('startBtn').disabled = true;
-      document.getElementById('status').innerText = "🚀 السحب الخارق للأرشيف شغال بالخلفية...";
-      await requestWakeLock();
-
-      // قائمة التصنيفات والموقع المباشرة اللي دزيتها
-      const targetSources = [
-        { name: "الأرشيف الشامل لأعمال أزورا", url: "https://azorafly.com/series/" },
-        { name: "تصنيف الدراما", url: "https://azorafly.com/series/?genres=%2B12" },
-        { name: "تصنيف الرومانسية", url: "https://azorafly.com/series/?genres=%2B8" },
-        { name: "تصنيف الأكشن", url: "https://azorafly.com/series/?genres=%2B414" }
-      ];
-
-      try {
-        for (let i = 0; i < targetSources.length; i++) {
-          await processTargetUrl(targetSources[i].url, targetSources[i].name);
-        }
-      } catch (err) {
-        printLog(`❌ خطأ: ${err.message}`);
-      }
-
-      document.getElementById('status').innerText = "🎉 اكتمل سحب كافة الأرشيف والتصنيفات بنجاح!";
-    }
-
-    document.getElementById('startBtn').addEventListener('click', startFullArchiving);
+    document.getElementById('startBtn').addEventListener('click', startArchiveScraping);
   </script>
 </body>
 </html>
