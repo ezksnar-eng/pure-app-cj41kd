@@ -129,8 +129,19 @@
               printLog(`  ⚠️ العمل محفوظ سابقاً بـ Firebase.`);
               mangaId = snap.docs[0].id;
             } else {
+              // رفع العمل بكل مسميات حقول الأغلفة الممكنة حتى يظهر في تطبيقك فوراً
               const docRef = await addDoc(collection(db, "manga"), {
-                title, cover, sourceUrl: mUrl, sourceSite: "Azora", createdAt: serverTimestamp()
+                title: title,
+                cover: cover,
+                coverUrl: cover,
+                image: cover,
+                poster: cover,
+                sourceUrl: mUrl,
+                sourceSite: "Azora",
+                type: "مانهوا",
+                status: "مستمر",
+                rating: 7.5,
+                createdAt: serverTimestamp()
               });
               mangaId = docRef.id;
               mangaCount++;
@@ -166,7 +177,6 @@
                   .map(cleanUrl)
                   .filter(src => src && (src.includes('.jpg') || src.includes('.png') || src.includes('.webp') || src.includes('uploads')));
 
-                // تعديل اسم الـ ID واستخدام addDoc لتفادي خطأ المستند الموجود سابقاً
                 await addDoc(collection(db, `manga/${mangaId}/chapters`), {
                   title: ch.txt || `فصل ${j + 1}`,
                   sourceUrl: ch.url,
