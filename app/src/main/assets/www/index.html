@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ساحب أزورا الخارق (سرعة 25X موازي) ⚡</title>
+  <title>ساحب أزورا المباشر - الأرشيف والتصنيفات ⚡</title>
   <style>
     :root { --main: #ff9800; --bg: #0b0b0e; --card: #16161a; --border: #26262e; }
     body { font-family: system-ui, -apple-system, sans-serif; background: var(--bg); color: #fff; padding: 15px; margin: 0; }
@@ -23,11 +23,11 @@
 <body>
 
   <div class="container">
-    <h2>ساحب أزورا الخارق (25 عامل بالتوازي) ⚡</h2>
-    <div class="status-badge" id="status">⚡ البروكسي الداخلي متصل وجاهز للعمل...</div>
+    <h2>ساحب أزورا المباشر (الأرشيف والتصنيفات) ⚡</h2>
+    <div class="status-badge" id="status">⚡ جاهز لسحب الأرشيف والتصنيفات...</div>
 
     <div class="controls">
-      <button class="btn" id="startBtn">🚀 بدء المسح الشامل والتصنيفات (سرعة 25X)</button>
+      <button class="btn" id="startBtn">🚀 بدء سحب الأرشيف والتصنيفات (25 عامل)</button>
     </div>
 
     <div class="grid-stats">
@@ -36,7 +36,7 @@
       <div class="stat-card"><h3 id="statImgs">0</h3><p>صور مرفوعة</p></div>
     </div>
 
-    <div id="logBox">اضغط على زر البدء لتشغيل 25 عامل سحب معاً...</div>
+    <div id="logBox">اضغط على زر البدء لبدء السحب المباشر...</div>
   </div>
 
   <script type="module">
@@ -57,7 +57,7 @@
 
     let mangaCount = 0, chapCount = 0, imgCount = 0;
     const processedUrls = new Set();
-    const CONCURRENCY_LIMIT = 25; // 25 عامل يشتغلون بوقت واحد
+    const CONCURRENCY_LIMIT = 25; // 25 عامل سحب متوازي
 
     async function requestWakeLock() {
       try {
@@ -83,14 +83,19 @@
       return cleaned;
     }
 
-    // دالة الجلب الموحدة والخاصة بالبروكسي الداخلي المدمج فقط مع إعادة المحاولة 3 مرات
-    async function fetchViaInternalProxy(targetUrl, retries = 3) {
+    // جلب ذكي ومضمون للبروكسي الداخلي
+    async function fetchViaSmartProxy(targetUrl) {
       const safeUrl = cleanUrl(targetUrl);
-      const proxyEndpoint = `http://127.0.0.1:8080/?url=${encodeURIComponent(safeUrl)}`;
+      
+      const proxyEndpoints = [
+        `http://127.0.0.1:8080/?url=${encodeURIComponent(safeUrl)}`,
+        `http://localhost:8080/?url=${encodeURIComponent(safeUrl)}`,
+        `http://127.0.0.1:8080/${safeUrl}`
+      ];
 
-      for (let attempt = 1; attempt <= retries; attempt++) {
+      for (let endpoint of proxyEndpoints) {
         try {
-          const res = await fetch(proxyEndpoint);
+          const res = await fetch(endpoint, { cache: "no-store" });
           if (res.ok) {
             const html = await res.text();
             if (html && html.length > 200 && !html.includes("Error fetching site")) {
@@ -98,13 +103,12 @@
             }
           }
         } catch (e) {}
-        await new Promise(r => setTimeout(r, 800)); // انتظار قصير قبل إعادة المحاولة
       }
 
-      throw new Error("فشل الجلب عبر البروكسي الداخلي.");
+      throw new Error("فشل الاتصال بالبروكسي الداخلي.");
     }
 
-    // معالجة مانهوا واحدة من ألفها لليائها
+    // معالجة مانهوا سينغل
     async function processSingleManga(mUrl) {
       if (processedUrls.has(mUrl)) return;
       processedUrls.add(mUrl);
@@ -114,12 +118,12 @@
         const snap = await getDocs(q);
 
         let mangaId;
-        const mDoc = await fetchViaInternalProxy(mUrl);
+        const mDoc = await fetchViaSmartProxy(mUrl);
         const title = mDoc.querySelector('meta[property="og:title"]')?.content || mDoc.title || "عمل أزورا";
         const cover = cleanUrl(mDoc.querySelector('meta[property="og:image"]')?.content || "");
 
         if (!snap.empty) {
-          printLog(`  ⚠️ [موجود سابقاً]: ${title}`);
+          printLog(`  ⚠️ [موجود سابقا]: ${title}`);
           mangaId = snap.docs[0].id;
         } else {
           const docRef = await addDoc(collection(db, "manga"), {
@@ -150,11 +154,10 @@
           if (!uniqueChaps.some(x => x.url === c.url)) uniqueChaps.push(c);
         });
 
-        // سحب الفصول بالتوازي أيضاً بواسطة العمال
         for (let j = 0; j < uniqueChaps.length; j++) {
           const ch = uniqueChaps[j];
           try {
-            const chDoc = await fetchViaInternalProxy(ch.url);
+            const chDoc = await fetchViaSmartProxy(ch.url);
             const imgElements = Array.from(chDoc.querySelectorAll('img'));
             
             const rawImgs = imgElements.map(img => img.getAttribute('data-src') || img.getAttribute('lazy-src') || img.src).filter(Boolean);
@@ -179,82 +182,67 @@
       } catch (err) {}
     }
 
-    // معالجة قائمة الأعمال بواسطة 25 عامل متوازين بنفس اللحظة
+    // معالجة 25 عمل بنفس اللحظة بالتوازي
     async function processBatchInParallel(mangaUrls) {
       for (let i = 0; i < mangaUrls.length; i += CONCURRENCY_LIMIT) {
         const batch = mangaUrls.slice(i, i + CONCURRENCY_LIMIT);
-        printLog(`\n⚡ 25 عامل يشتغلون بوقت واحد لرفع (${batch.length}) أعمال...`);
+        printLog(`\n⚡ 25 عامل يرفعون (${batch.length}) أعمال بوقت واحد...`);
         await Promise.all(batch.map(url => processSingleManga(url)));
       }
     }
 
-    // معالجة تصنيف كامل مع كافة صفحاته
-    async function processSingleGenre(genreUrl, genreIndex, totalGenres) {
-      printLog(`\n📁 [تصنيف ${genreIndex}/${totalGenres}] جاري الفحص: ${genreUrl}`);
+    // مسح رابط الأرشيف أو التصنيف بصفحاته
+    async function processTargetUrl(targetUrl, titleName) {
+      printLog(`\n📁 [بدء سحب]: ${titleName}\n🔗 الرابط: ${targetUrl}`);
 
       for (let p = 1; p <= 300; p++) {
-        const pageUrl = genreUrl.includes('?') ? `${genreUrl}&page=${p}` : `${genreUrl}?page=${p}`;
+        const pageUrl = targetUrl.includes('?') ? `${targetUrl}&page=${p}` : `${targetUrl}?page=${p}`;
         try {
-          const pDoc = await fetchViaInternalProxy(pageUrl);
+          const pDoc = await fetchViaSmartProxy(pageUrl);
           const links = Array.from(pDoc.querySelectorAll('a'))
             .map(a => cleanUrl(a.href || a.getAttribute('href')))
-            .filter(h => h && (h.includes('/series/') || h.includes('/manga/') || h.includes('/work/')));
+            .filter(h => h && (h.includes('/series/') || h.includes('/manga/') || h.includes('/work/')) && !h.endsWith('/series/') && !h.includes('genres='));
 
           const mangaList = [...new Set(links)].filter(url => !processedUrls.has(url));
 
           if (mangaList.length === 0) {
-            printLog(`  🏁 انتهت صفحات التصنيف عند الصفحة ${p - 1}.`);
+            printLog(`  🏁 اكتمل سحب هذا القسم عند الصفحة ${p - 1}.`);
             break;
           }
 
-          printLog(`  📑 الصفحة ${p}: عثرنا على ${mangaList.length} عمل.`);
+          printLog(`  📑 الصفحة ${p}: لقينه ${mangaList.length} عمل.`);
           await processBatchInParallel(mangaList);
 
         } catch (pErr) {
-          printLog(`  ⚠️ تعذر جلب الصفحة ${p} للتصنيف، جاري القفز للتصنيف القادم...`);
+          printLog(`  ⚠️ تعذر جلب الصفحة ${p}، سيتولى العامل التالي القفز...`);
           break;
         }
       }
     }
 
-    // بدء العملية الشاملة
+    // بدء سحب الأرشيف والتصنيفات المباشرة
     async function startFullArchiving() {
       document.getElementById('startBtn').disabled = true;
-      document.getElementById('status').innerText = "🚀 السحب الخارق (25X) شغال بالخلفية...";
+      document.getElementById('status').innerText = "🚀 السحب الخارق للأرشيف شغال بالخلفية...";
       await requestWakeLock();
 
+      // قائمة التصنيفات والموقع المباشرة اللي دزيتها
+      const targetSources = [
+        { name: "الأرشيف الشامل لأعمال أزورا", url: "https://azorafly.com/series/" },
+        { name: "تصنيف الدراما", url: "https://azorafly.com/series/?genres=%2B12" },
+        { name: "تصنيف الرومانسية", url: "https://azorafly.com/series/?genres=%2B8" },
+        { name: "تصنيف الأكشن", url: "https://azorafly.com/series/?genres=%2B414" }
+      ];
+
       try {
-        printLog("🔍 جاري جلب أقسام التصنيفات والأرشيف عبر البروكسي الداخلي...");
-
-        let uniqueGenres = [
-          "https://azorafly.com/series?type=manhwa",
-          "https://azorafly.com/series?type=manga",
-          "https://azorafly.com/series"
-        ];
-
-        try {
-          const homeDoc = await fetchViaInternalProxy("https://azorafly.com");
-          const fetchedLinks = Array.from(homeDoc.querySelectorAll('a'))
-            .map(a => cleanUrl(a.href || a.getAttribute('href')))
-            .filter(h => h.includes('/genre') || h.includes('/genres') || h.includes('/category') || h.includes('/type/'));
-          
-          if (fetchedLinks.length > 0) {
-            uniqueGenres = [...new Set([...fetchedLinks, ...uniqueGenres])];
-          }
-        } catch (e) {}
-
-        printLog(`🎯 عثرنا على (${uniqueGenres.length}) تصنيف. سيتم توزيع العمال لرفع كل الأعمال!`);
-
-        // تشغيل معالجة التصنيفات بالتوازي بمجموعات العمال (25 عامل)
-        for (let g = 0; g < uniqueGenres.length; g++) {
-          await processSingleGenre(uniqueGenres[g], g + 1, uniqueGenres.length);
+        for (let i = 0; i < targetSources.length; i++) {
+          await processTargetUrl(targetSources[i].url, targetSources[i].name);
         }
-
       } catch (err) {
-        printLog(`❌ خطأ عام: ${err.message}`);
+        printLog(`❌ خطأ: ${err.message}`);
       }
 
-      document.getElementById('status').innerText = "🎉 اكتمل سحب كافة التصنيفات والمحتوى بنجاح!";
+      document.getElementById('status').innerText = "🎉 اكتمل سحب كافة الأرشيف والتصنيفات بنجاح!";
     }
 
     document.getElementById('startBtn').addEventListener('click', startFullArchiving);
