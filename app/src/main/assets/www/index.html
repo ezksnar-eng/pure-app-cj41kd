@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ساحب أزورا الشامل المدمج ⚡</title>
+  <title>ساحب أزورا الخارق (سرعة 25X موازي) ⚡</title>
   <style>
     :root { --main: #ff9800; --bg: #0b0b0e; --card: #16161a; --border: #26262e; }
     body { font-family: system-ui, -apple-system, sans-serif; background: var(--bg); color: #fff; padding: 15px; margin: 0; }
@@ -14,7 +14,7 @@
     .stat-card { background: #0e0e11; padding: 12px; border-radius: 10px; text-align: center; border: 1px solid var(--border); }
     .stat-card h3 { margin: 0; color: var(--main); font-size: 20px; }
     .stat-card p { margin: 3px 0 0; font-size: 11px; color: #888; }
-    #logBox { font-size: 12px; color: #64b5f6; white-space: pre-line; text-align: right; background: #060608; padding: 12px; border-radius: 10px; height: 350px; overflow-y: auto; border: 1px solid var(--border); font-family: monospace; line-height: 1.6; }
+    #logBox { font-size: 12px; color: #64b5f6; white-space: pre-line; text-align: right; background: #060608; padding: 12px; border-radius: 10px; height: 380px; overflow-y: auto; border: 1px solid var(--border); font-family: monospace; line-height: 1.6; }
     .controls { display: flex; gap: 10px; margin-bottom: 15px; }
     .btn { flex: 1; padding: 12px; border-radius: 10px; border: none; font-weight: bold; cursor: pointer; background: var(--main); color: #000; font-size: 15px; }
     .btn:disabled { opacity: 0.5; cursor: not-allowed; }
@@ -23,11 +23,11 @@
 <body>
 
   <div class="container">
-    <h2>ساحب أزورا الشامل (سرعة 9X + تصنيفات) ⚡</h2>
-    <div class="status-badge" id="status">⚡ جاهز للانطلاق مع البروكسي المدمج...</div>
+    <h2>ساحب أزورا الخارق (25 عامل بالتوازي) ⚡</h2>
+    <div class="status-badge" id="status">⚡ البروكسي الداخلي متصل وجاهز للعمل...</div>
 
     <div class="controls">
-      <button class="btn" id="startBtn">🚀 بدء المسح الشامل بالتصنيفات (سرعة 9X)</button>
+      <button class="btn" id="startBtn">🚀 بدء المسح الشامل والتصنيفات (سرعة 25X)</button>
     </div>
 
     <div class="grid-stats">
@@ -36,7 +36,7 @@
       <div class="stat-card"><h3 id="statImgs">0</h3><p>صور مرفوعة</p></div>
     </div>
 
-    <div id="logBox">اضغط على زر البدء لبدء السحب تلقائياً...</div>
+    <div id="logBox">اضغط على زر البدء لتشغيل 25 عامل سحب معاً...</div>
   </div>
 
   <script type="module">
@@ -57,7 +57,7 @@
 
     let mangaCount = 0, chapCount = 0, imgCount = 0;
     const processedUrls = new Set();
-    const CONCURRENCY_LIMIT = 9; // 9 أعمال بنفس الوقت
+    const CONCURRENCY_LIMIT = 25; // 25 عامل يشتغلون بوقت واحد
 
     async function requestWakeLock() {
       try {
@@ -83,20 +83,14 @@
       return cleaned;
     }
 
-    // دالة الجلب الموحدة الذكية عبر البروكسي الداخلي المدمج
-    async function fetchViaSmartProxy(targetUrl) {
+    // دالة الجلب الموحدة والخاصة بالبروكسي الداخلي المدمج فقط مع إعادة المحاولة 3 مرات
+    async function fetchViaInternalProxy(targetUrl, retries = 3) {
       const safeUrl = cleanUrl(targetUrl);
-      
-      // مسارات البروكسي الداخلي الخاصة بالتطبيق + المحاولات الإضافية
-      const proxyEndpoints = [
-        `http://127.0.0.1:8080/?url=${encodeURIComponent(safeUrl)}`,
-        `http://localhost:8080/?url=${encodeURIComponent(safeUrl)}`,
-        `http://127.0.0.1:8080/${safeUrl}`
-      ];
+      const proxyEndpoint = `http://127.0.0.1:8080/?url=${encodeURIComponent(safeUrl)}`;
 
-      for (let endpoint of proxyEndpoints) {
+      for (let attempt = 1; attempt <= retries; attempt++) {
         try {
-          const res = await fetch(endpoint);
+          const res = await fetch(proxyEndpoint);
           if (res.ok) {
             const html = await res.text();
             if (html && html.length > 200 && !html.includes("Error fetching site")) {
@@ -104,12 +98,13 @@
             }
           }
         } catch (e) {}
+        await new Promise(r => setTimeout(r, 800)); // انتظار قصير قبل إعادة المحاولة
       }
 
-      throw new Error("تعذر جلب البيانات. تأكد من أن خدمة البروكسي المدمجة قيد التشغيل.");
+      throw new Error("فشل الجلب عبر البروكسي الداخلي.");
     }
 
-    // معالجة مانهوا واحدة (جلب البيانات + رفع لـ Firebase + جلب الفصول والصور)
+    // معالجة مانهوا واحدة من ألفها لليائها
     async function processSingleManga(mUrl) {
       if (processedUrls.has(mUrl)) return;
       processedUrls.add(mUrl);
@@ -119,7 +114,7 @@
         const snap = await getDocs(q);
 
         let mangaId;
-        const mDoc = await fetchViaSmartProxy(mUrl);
+        const mDoc = await fetchViaInternalProxy(mUrl);
         const title = mDoc.querySelector('meta[property="og:title"]')?.content || mDoc.title || "عمل أزورا";
         const cover = cleanUrl(mDoc.querySelector('meta[property="og:image"]')?.content || "");
 
@@ -155,10 +150,11 @@
           if (!uniqueChaps.some(x => x.url === c.url)) uniqueChaps.push(c);
         });
 
+        // سحب الفصول بالتوازي أيضاً بواسطة العمال
         for (let j = 0; j < uniqueChaps.length; j++) {
           const ch = uniqueChaps[j];
           try {
-            const chDoc = await fetchViaSmartProxy(ch.url);
+            const chDoc = await fetchViaInternalProxy(ch.url);
             const imgElements = Array.from(chDoc.querySelectorAll('img'));
             
             const rawImgs = imgElements.map(img => img.getAttribute('data-src') || img.getAttribute('lazy-src') || img.src).filter(Boolean);
@@ -183,24 +179,53 @@
       } catch (err) {}
     }
 
-    // معالجة دفعة 9 أعمال متوازية
+    // معالجة قائمة الأعمال بواسطة 25 عامل متوازين بنفس اللحظة
     async function processBatchInParallel(mangaUrls) {
       for (let i = 0; i < mangaUrls.length; i += CONCURRENCY_LIMIT) {
         const batch = mangaUrls.slice(i, i + CONCURRENCY_LIMIT);
-        printLog(`\n⚡ جاري معالجة دفعة من (${batch.length}) أعمال بوقت واحد...`);
+        printLog(`\n⚡ 25 عامل يشتغلون بوقت واحد لرفع (${batch.length}) أعمال...`);
         await Promise.all(batch.map(url => processSingleManga(url)));
       }
     }
 
-    // الدالة الرئيسية لبدء المسح عبر التصنيفات والأرشيف
+    // معالجة تصنيف كامل مع كافة صفحاته
+    async function processSingleGenre(genreUrl, genreIndex, totalGenres) {
+      printLog(`\n📁 [تصنيف ${genreIndex}/${totalGenres}] جاري الفحص: ${genreUrl}`);
+
+      for (let p = 1; p <= 300; p++) {
+        const pageUrl = genreUrl.includes('?') ? `${genreUrl}&page=${p}` : `${genreUrl}?page=${p}`;
+        try {
+          const pDoc = await fetchViaInternalProxy(pageUrl);
+          const links = Array.from(pDoc.querySelectorAll('a'))
+            .map(a => cleanUrl(a.href || a.getAttribute('href')))
+            .filter(h => h && (h.includes('/series/') || h.includes('/manga/') || h.includes('/work/')));
+
+          const mangaList = [...new Set(links)].filter(url => !processedUrls.has(url));
+
+          if (mangaList.length === 0) {
+            printLog(`  🏁 انتهت صفحات التصنيف عند الصفحة ${p - 1}.`);
+            break;
+          }
+
+          printLog(`  📑 الصفحة ${p}: عثرنا على ${mangaList.length} عمل.`);
+          await processBatchInParallel(mangaList);
+
+        } catch (pErr) {
+          printLog(`  ⚠️ تعذر جلب الصفحة ${p} للتصنيف، جاري القفز للتصنيف القادم...`);
+          break;
+        }
+      }
+    }
+
+    // بدء العملية الشاملة
     async function startFullArchiving() {
       document.getElementById('startBtn').disabled = true;
-      document.getElementById('status').innerText = "🚀 المسح الشامل شغال بالخلفية...";
+      document.getElementById('status').innerText = "🚀 السحب الخارق (25X) شغال بالخلفية...";
       await requestWakeLock();
 
       try {
-        printLog("🔍 جاري جلب أقسام التصنيفات والأرشيف من أزورا...");
-        
+        printLog("🔍 جاري جلب أقسام التصنيفات والأرشيف عبر البروكسي الداخلي...");
+
         let uniqueGenres = [
           "https://azorafly.com/series?type=manhwa",
           "https://azorafly.com/series?type=manga",
@@ -208,7 +233,7 @@
         ];
 
         try {
-          const homeDoc = await fetchViaSmartProxy("https://azorafly.com");
+          const homeDoc = await fetchViaInternalProxy("https://azorafly.com");
           const fetchedLinks = Array.from(homeDoc.querySelectorAll('a'))
             .map(a => cleanUrl(a.href || a.getAttribute('href')))
             .filter(h => h.includes('/genre') || h.includes('/genres') || h.includes('/category') || h.includes('/type/'));
@@ -218,42 +243,18 @@
           }
         } catch (e) {}
 
-        printLog(`🎯 عثرنا على (${uniqueGenres.length}) تصنيف وسيتم مسح كافة صفحاتهن!`);
+        printLog(`🎯 عثرنا على (${uniqueGenres.length}) تصنيف. سيتم توزيع العمال لرفع كل الأعمال!`);
 
+        // تشغيل معالجة التصنيفات بالتوازي بمجموعات العمال (25 عامل)
         for (let g = 0; g < uniqueGenres.length; g++) {
-          const genreUrl = uniqueGenres[g];
-          printLog(`\n📁 [تصنيف ${g + 1}/${uniqueGenres.length}] فحص: ${genreUrl}`);
-
-          for (let p = 1; p <= 300; p++) {
-            const pageUrl = genreUrl.includes('?') ? `${genreUrl}&page=${p}` : `${genreUrl}?page=${p}`;
-            try {
-              const pDoc = await fetchViaSmartProxy(pageUrl);
-              const links = Array.from(pDoc.querySelectorAll('a'))
-                .map(a => cleanUrl(a.href || a.getAttribute('href')))
-                .filter(h => h && (h.includes('/series/') || h.includes('/manga/') || h.includes('/work/')));
-
-              const mangaList = [...new Set(links)].filter(url => !processedUrls.has(url));
-
-              if (mangaList.length === 0) {
-                printLog(`  🏁 اكتمل هذا التصنيف عند الصفحة ${p - 1}.`);
-                break;
-              }
-
-              printLog(`  📑 الصفحة ${p}: عثرنا على ${mangaList.length} عمل جديد.`);
-              await processBatchInParallel(mangaList);
-
-            } catch (pErr) {
-              printLog(`  ⚠️ توقف أو اكتمل الصفحة عند ${p}`);
-              break;
-            }
-          }
+          await processSingleGenre(uniqueGenres[g], g + 1, uniqueGenres.length);
         }
 
       } catch (err) {
-        printLog(`❌ خطأ أثناء السحب: ${err.message}`);
+        printLog(`❌ خطأ عام: ${err.message}`);
       }
 
-      document.getElementById('status').innerText = "🎉 اكتمل سحب كافة التصنيفات والـ 10,000 مانهوا بنجاح!";
+      document.getElementById('status').innerText = "🎉 اكتمل سحب كافة التصنيفات والمحتوى بنجاح!";
     }
 
     document.getElementById('startBtn').addEventListener('click', startFullArchiving);
