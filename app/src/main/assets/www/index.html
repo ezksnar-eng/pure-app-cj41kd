@@ -3,78 +3,52 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>الساحب العملاق - Pure Mega Scraper v4 🕷️</title>
+  <title>الساحب الأسطوري المباشر - Azora Engine v6 🕷️</title>
   <style>
-    :root { --main: #ff9800; --bg: #0f0f12; --card: #18181c; }
-    body { font-family: system-ui, -apple-system, sans-serif; background: var(--bg); color: #fff; padding: 20px; margin: 0; }
-    .container { background: var(--card); padding: 25px; border-radius: 20px; max-width: 750px; margin: auto; box-shadow: 0 10px 30px rgba(0,0,0,0.8); border: 1px solid #2a2a30; }
-    h2 { color: var(--main); text-align: center; margin-top: 0; }
-    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-    .form-group { margin-bottom: 12px; text-align: right; }
-    label { display: block; font-size: 13px; color: #aaa; margin-bottom: 4px; }
-    input { width: 100%; padding: 12px; border-radius: 10px; border: 1px solid #333; background: #222228; color: #fff; font-size: 14px; box-sizing: border-box; }
+    :root { --main: #ff9800; --bg: #0b0b0e; --card: #16161a; --border: #26262e; }
+    body { font-family: system-ui, -apple-system, sans-serif; background: var(--bg); color: #fff; padding: 15px; margin: 0; }
+    .container { background: var(--card); padding: 20px; border-radius: 18px; max-width: 650px; margin: auto; border: 1px solid var(--border); box-shadow: 0 10px 30px rgba(0,0,0,0.9); }
+    h2 { color: var(--main); text-align: center; margin: 0 0 10px; font-size: 22px; }
     
-    .stats-bar { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 15px 0; background: #101014; padding: 15px; border-radius: 12px; text-align: center; }
-    .stat-box h3 { margin: 0; color: var(--main); font-size: 20px; }
-    .stat-box p { margin: 2px 0 0; font-size: 12px; color: #888; }
+    .status-badge { display: block; text-align: center; padding: 8px 15px; border-radius: 12px; font-size: 13px; font-weight: bold; background: #1f1a0e; color: var(--main); border: 1px solid var(--main); margin-bottom: 15px; }
+    
+    .grid-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 15px; }
+    .stat-card { background: #0e0e11; padding: 12px; border-radius: 10px; text-align: center; border: 1px solid var(--border); }
+    .stat-card h3 { margin: 0; color: var(--main); font-size: 20px; }
+    .stat-card p { margin: 3px 0 0; font-size: 11px; color: #888; }
 
-    .btn-group { display: flex; gap: 10px; margin-top: 15px; }
-    button { flex: 1; padding: 14px; border-radius: 10px; border: none; background: var(--main); color: #000; font-weight: bold; font-size: 15px; cursor: pointer; transition: 0.2s; }
+    .progress-box { width: 100%; background: #222; height: 12px; border-radius: 6px; overflow: hidden; margin-bottom: 15px; border: 1px solid #333; }
+    .progress-fill { width: 0%; height: 100%; background: linear-gradient(90deg, #ff9800, #ffb74d); transition: width 0.3s; }
+
+    .btn-group { display: flex; gap: 10px; margin-bottom: 15px; }
+    button { flex: 1; padding: 12px; border-radius: 10px; border: none; font-weight: bold; font-size: 14px; cursor: pointer; transition: 0.2s; }
     button.stop { background: #e53935; color: #fff; }
-    button.secondary { background: #333; color: #fff; }
+    button.start { background: var(--main); color: #000; }
     button:disabled { opacity: 0.4; cursor: not-allowed; }
 
-    .progress-box { width: 100%; background: #222; height: 10px; border-radius: 5px; margin-top: 15px; overflow: hidden; }
-    .progress-fill { width: 0%; height: 100%; background: var(--main); transition: width 0.3s; }
-    #logBox { font-size: 12px; color: #64b5f6; white-space: pre-line; text-align: right; background: #08080a; padding: 15px; border-radius: 10px; height: 250px; overflow-y: auto; border: 1px solid #222; font-family: monospace; margin-top: 15px; line-height: 1.6; }
+    #logBox { font-size: 12px; color: #64b5f6; white-space: pre-line; text-align: right; background: #060608; padding: 12px; border-radius: 10px; height: 260px; overflow-y: auto; border: 1px solid var(--border); font-family: monospace; line-height: 1.6; }
   </style>
 </head>
 <body>
 
   <div class="container">
-    <h2>الساحب العملاق المتقدم (Mega Scraper v4) 🚀</h2>
+    <h2>ساحب أزورا العملاق (Azora Ultra v6) ⚡</h2>
+    <div class="status-badge" id="status">🚀 التشغيل التلقائي شغّال...</div>
 
-    <div class="form-group">
-      <label>رابط صفحة الأرشيف/المكتبة الأساسي (ضع PAGE_NUM مكان الرقم):</label>
-      <input type="url" id="siteUrl" placeholder="https://example.com/manga?page=PAGE_NUM" value="">
-    </div>
-
-    <div class="grid-2">
-      <div class="form-group">
-        <label>من صفحة رقم:</label>
-        <input type="number" id="startPage" value="1">
-      </div>
-      <div class="form-group">
-        <label>إلى صفحة رقم:</label>
-        <input type="number" id="endPage" value="1">
-      </div>
-    </div>
-
-    <div class="grid-2">
-      <div class="form-group">
-        <label>أقصى عدد شبترات لكل عمل:</label>
-        <input type="number" id="maxChaps" value="15">
-      </div>
-      <div class="form-group">
-        <label>تأخير حماية الـ IP (ثواني):</label>
-        <input type="number" id="delaySec" value="1.5" step="0.5">
-      </div>
-    </div>
-
-    <div class="stats-bar">
-      <div class="stat-box"><h3 id="statManga">0</h3><p>أعمال مسحوبة</p></div>
-      <div class="stat-box"><h3 id="statChaps">0</h3><p>فصول مرفوعة</p></div>
-      <div class="stat-box"><h3 id="statImgs">0</h3><p>صور معالجة</p></div>
-    </div>
-
-    <div class="btn-group">
-      <button id="startBtn" onclick="startMegaCrawl()">بدء المسح الشامل</button>
-      <button id="stopBtn" class="stop" onclick="stopCrawl()" disabled>إيقاف</button>
-      <button class="secondary" onclick="exportData()">تنزيل JSON</button>
+    <div class="grid-stats">
+      <div class="stat-card"><h3 id="statManga">0</h3><p>أعمال جديدة</p></div>
+      <div class="stat-card"><h3 id="statChaps">0</h3><p>فصول مرفوعة</p></div>
+      <div class="stat-card"><h3 id="statImgs">0</h3><p>صور معالجة</p></div>
     </div>
 
     <div class="progress-box"><div class="progress-fill" id="pFill"></div></div>
-    <div id="logBox">جاهز للعمل... قوم أكل وارجع شغّله! 🍕</div>
+
+    <div class="btn-group">
+      <button id="stopBtn" class="stop" onclick="toggleEngine(false)">إيقاف مؤقت 🛑</button>
+      <button id="startBtn" class="start" onclick="toggleEngine(true)" disabled>استئناف العمل 🔄</button>
+    </div>
+
+    <div id="logBox">جاري الاتصال بسيرفر البروكسي وبدء مسح azorafly.com...</div>
   </div>
 
   <script type="module">
@@ -93,9 +67,11 @@
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
 
-    let isRunning = false;
-    let scrapedData = [];
-    let countManga = 0, countChaps = 0, countImgs = 0;
+    const AZORA_BASE = "https://azorafly.com/";
+    const LOCAL_PROXY = "http://localhost:3000/fetch?url="; // رابط البروكسي مالتنا
+
+    let isRunning = true;
+    let mangaCount = 0, chapCount = 0, imgCount = 0;
 
     const wait = ms => new Promise(res => setTimeout(res, ms));
 
@@ -105,144 +81,163 @@
       b.scrollTop = b.scrollHeight;
     }
 
-    function setProgress(p) { document.getElementById('pFill').style.width = p + '%'; }
-
-    async function fetchHTML(url) {
-      const proxy = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
-      const res = await fetch(proxy);
-      const d = await res.json();
-      if (!d.contents) throw new Error("تعذر جلب الصفحة");
-      return new DOMParser().parseFromString(d.contents, 'text/html');
+    function setProgress(percent) {
+      document.getElementById('pFill').style.width = Math.min(percent, 100) + '%';
     }
 
-    window.stopCrawl = function() {
-      isRunning = false;
-      printLog("🛑 تم إصدار أمر الإيقاف...");
+    window.toggleEngine = function(state) {
+      isRunning = state;
+      document.getElementById('stopBtn').disabled = !state;
+      document.getElementById('startBtn').disabled = state;
+      document.getElementById('status').innerText = state ? "🔄 جاري السحب..." : "⏸️ متوقف مؤقتاً";
+      printLog(state ? "▶️ تم استئناف العمل." : "🛑 تم إيقاف الساحب.");
+      if (state) runScraperEngine();
     };
 
-    window.exportData = function() {
-      const blob = new Blob([JSON.stringify(scrapedData, null, 2)], { type: 'application/json' });
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = `pure_scraped_manga_${Date.now()}.json`;
-      a.click();
-    };
+    async function fetchViaProxy(url) {
+      const fullUrl = `${LOCAL_PROXY}${encodeURIComponent(url)}`;
+      const res = await fetch(fullUrl);
+      if (!res.ok) throw new Error(`البروكسي رجّع خطأ (${res.status})`);
+      const text = await res.text();
+      return new DOMParser().parseFromString(text, 'text/html');
+    }
 
-    window.startMegaCrawl = async function() {
-      const baseUrl = document.getElementById('siteUrl').value.trim();
-      const startP = parseInt(document.getElementById('startPage').value) || 1;
-      const endP = parseInt(document.getElementById('endPage').value) || 1;
-      const maxChaps = parseInt(document.getElementById('maxChaps').value) || 15;
-      const delay = parseFloat(document.getElementById('delaySec').value) * 1000 || 1500;
+    // تصليح روابط الصور المكسورة
+    function fixImgUrl(rawSrc) {
+      if (!rawSrc) return "";
+      let src = rawSrc.trim();
+      if (src.startsWith("//")) return "https:" + src;
+      if (src.startsWith("/")) return "https://azorafly.com" + src;
+      return src;
+    }
 
-      if (!baseUrl) return alert("يرجى إدخال الرابط بالأول!");
+    async function runScraperEngine() {
+      printLog("🌐 جاري جلب الصفحة الرئيسية لموقع أزورا...");
 
-      isRunning = true;
-      document.getElementById('startBtn').disabled = true;
-      document.getElementById('stopBtn').disabled = false;
-      document.getElementById('logBox').innerText = "🚀 انطلاق الساحب العملاق...";
+      try {
+        const homeDoc = await fetchViaProxy(AZORA_BASE);
 
-      for (let page = startP; page <= endP; page++) {
-        if (!isRunning) break;
+        // جلب كل روابط الأعمال المتاحة بالصفحة
+        const links = Array.from(homeDoc.querySelectorAll('a'))
+          .map(a => a.href || a.getAttribute('href'))
+          .filter(h => h && (h.includes('/series/') || h.includes('/manga/') || h.includes('/work/')));
 
-        const currentPUrl = baseUrl.includes("PAGE_NUM") ? baseUrl.replace("PAGE_NUM", page) : baseUrl;
-        printLog(`\n================ PAGE [${page}/${endP}] ================`);
+        const uniqueLinks = [...new Set(links)];
+        printLog(`🎯 عثرنا على (${uniqueLinks.length}) مانهاوا في الرئيسية!`);
 
-        try {
-          const doc = await fetchHTML(currentPUrl);
-          const links = Array.from(doc.querySelectorAll('a'))
-            .map(a => a.href || a.getAttribute('href'))
-            .filter(h => h && (h.includes('/manga/') || h.includes('/series/') || h.includes('/manhwa/')));
+        for (let i = 0; i < uniqueLinks.length; i++) {
+          if (!isRunning) break;
 
-          const uniqueManga = [...new Set(links)];
-          printLog(`🎯 عثرنا على ${uniqueManga.length} عمل بصفحة رقم ${page}`);
+          let mUrl = uniqueLinks[i];
+          if (!mUrl.startsWith('http')) mUrl = "https://azorafly.com" + (mUrl.startsWith('/') ? '' : '/') + mUrl;
 
-          for (let i = 0; i < uniqueManga.length; i++) {
-            if (!isRunning) break;
-            const mUrl = uniqueManga[i];
+          printLog(`\n📖 [${i + 1}/${uniqueLinks.length}] معالجة: ${mUrl}`);
 
-            try {
-              const mDoc = await fetchHTML(mUrl);
-              const title = mDoc.querySelector('meta[property="og:title"]')?.content || mDoc.title || "بدون عنوان";
-              const cover = mDoc.querySelector('meta[property="og:image"]')?.content || "";
+          try {
+            const mDoc = await fetchViaProxy(mUrl);
 
-              printLog(`\n📖 [${i+1}/${uniqueManga.length}] جاري معالجة: ${title}`);
+            // استخراج تفاصيل العمل الشاملة
+            const title = mDoc.querySelector('meta[property="og:title"]')?.content || mDoc.title || "عنوان أزورا";
+            const rawCover = mDoc.querySelector('meta[property="og:image"]')?.content || "";
+            const cover = fixImgUrl(rawCover);
 
-              // فحص إذا المانهاوا موجودة مسبقاً
-              const q = query(collection(db, "manga"), where("sourceUrl", "==", mUrl));
-              const snap = await getDocs(q);
-              
-              let mangaId;
-              if (!snap.empty) {
-                printLog(`  ⚠️ العمل موجود مسبقاً، تخطي الإنشاء...`);
-                mangaId = snap.docs[0].id;
-              } else {
-                const docRef = await addDoc(collection(db, "manga"), {
-                  title, cover, sourceUrl: mUrl, createdAt: serverTimestamp()
-                });
-                mangaId = docRef.id;
-                countManga++;
-                document.getElementById('statManga').innerText = countManga;
-              }
+            // استخراج الوصف/القصة والتصنيفات
+            const description = mDoc.querySelector('meta[name="description"]')?.content || mDoc.querySelector('.summary, .description, p')?.innerText?.trim() || "لا يوجد وصف";
+            const genres = Array.from(mDoc.querySelectorAll('a[href*="/genre/"]')).map(g => g.innerText.trim()).filter(Boolean);
 
-              // جلب الفصول
-              const chLinks = Array.from(mDoc.querySelectorAll('a'))
-                .map(a => ({ url: a.href || a.getAttribute('href'), txt: a.innerText.trim() }))
-                .filter(c => c.url && (c.url.includes('chapter') || c.url.includes('/ch-')));
+            // فحص تكرار العمل بـ Firebase
+            const q = query(collection(db, "manga"), where("sourceUrl", "==", mUrl));
+            const snap = await getDocs(q);
 
-              const uniqueChaps = [];
-              chLinks.forEach(c => { if (!uniqueChaps.some(x => x.url === c.url)) uniqueChaps.push(c); });
-
-              const targetChaps = uniqueChaps.slice(0, maxChaps);
-              printLog(`  └─ جاري سحب (${targetChaps.length}) فصل...`);
-
-              for (let j = 0; j < targetChaps.length; j++) {
-                if (!isRunning) break;
-                const ch = targetChaps[j];
-
-                try {
-                  const chDoc = await fetchHTML(ch.url);
-                  const imgs = Array.from(chDoc.querySelectorAll('img'))
-                    .map(img => img.src || img.getAttribute('data-src') || img.getAttribute('lazy-src'))
-                    .filter(src => src && (src.includes('.jpg') || src.includes('.png') || src.includes('.webp')) && !src.includes('banner'));
-
-                  await addDoc(collection(db, `manga/${mangaId}/chapters`), {
-                    title: ch.txt || `فصل ${j+1}`,
-                    sourceUrl: ch.url,
-                    images: imgs,
-                    order: j + 1
-                  });
-
-                  countChaps++;
-                  countImgs += imgs.length;
-                  document.getElementById('statChaps').innerText = countChaps;
-                  document.getElementById('statImgs').innerText = countImgs;
-
-                  printLog(`     ├─ ✅ ${ch.txt || 'فصل'}: تم حفظ ${imgs.length} صورة`);
-                } catch (e) {
-                  printLog(`     ├─ ❌ فشل الفصل: ${e.message}`);
-                }
-                await wait(400);
-              }
-
-            } catch (e) {
-              printLog(`  ❌ خطأ بالعمل: ${e.message}`);
+            let mangaId;
+            if (!snap.empty) {
+              printLog(`  ⚠️ العمل محفوط سابقاً، جاري التحديث أو سحب الفصول الجديد...`);
+              mangaId = snap.docs[0].id;
+            } else {
+              const docRef = await addDoc(collection(db, "manga"), {
+                title, cover, description, genres, sourceUrl: mUrl, sourceSite: "Azora", createdAt: serverTimestamp()
+              });
+              mangaId = docRef.id;
+              mangaCount++;
+              document.getElementById('statManga').innerText = mangaCount;
+              printLog(`  ✨ تم حفظ العمل: ${title}`);
             }
 
-            setProgress(((i + 1) / uniqueManga.length) * 100);
-            await wait(delay);
+            // استخراج الفصول
+            const chAnchors = Array.from(mDoc.querySelectorAll('a'))
+              .map(a => ({
+                url: a.href || a.getAttribute('href'),
+                txt: a.innerText.trim()
+              }))
+              .filter(c => c.url && (c.url.includes('chapter') || c.url.includes('/ch-') || c.txt.includes('فصل')));
+
+            const uniqueChaps = [];
+            chAnchors.forEach(c => {
+              let fullChUrl = c.url.startsWith('http') ? c.url : "https://azorafly.com" + (c.url.startsWith('/') ? '' : '/') + c.url;
+              if (!uniqueChaps.some(x => x.url === fullChUrl)) uniqueChaps.push({ url: fullChUrl, txt: c.txt });
+            });
+
+            printLog(`  └─ جاري سحب (${uniqueChaps.length}) فصل...`);
+
+            for (let j = 0; j < uniqueChaps.length; j++) {
+              if (!isRunning) break;
+              const ch = uniqueChaps[j];
+
+              try {
+                const chDoc = await fetchViaProxy(ch.url);
+                const imgElements = Array.from(chDoc.querySelectorAll('img'));
+                
+                const rawImgs = imgElements.map(img => 
+                  img.getAttribute('data-src') || img.getAttribute('lazy-src') || img.src || img.getAttribute('data-lazy-src')
+                ).filter(Boolean);
+
+                const validImgs = [...new Set(rawImgs)]
+                  .map(fixImgUrl)
+                  .filter(src => src && (src.includes('.jpg') || src.includes('.png') || src.includes('.webp') || src.includes('uploads')));
+
+                await addDoc(collection(db, `manga/${mangaId}/chapters`), {
+                  title: ch.txt || `فصل ${j + 1}`,
+                  sourceUrl: ch.url,
+                  images: validImgs,
+                  order: j + 1
+                });
+
+                chapCount++;
+                imgCount += validImgs.length;
+                document.getElementById('statChaps').innerText = chapCount;
+                document.getElementById('statImgs').innerText = imgCount;
+
+                printLog(`     ├─ ✅ ${ch.txt || 'فصل'}: تم رفع ${validImgs.length} صورة`);
+              } catch (err) {
+                printLog(`     ├─ ❌ فشل الفصل: ${err.message}`);
+              }
+
+              await wait(300); // حماية للبروكسي والسيرفر
+            }
+
+          } catch (err) {
+            printLog(`  ❌ خطأ بـ ${mUrl}: ${err.message}`);
           }
 
-        } catch (e) {
-          printLog(`❌ خطأ بالصفحة ${page}: ${e.message}`);
+          setProgress(((i + 1) / uniqueLinks.length) * 100);
+          await wait(800);
         }
-      }
 
-      isRunning = false;
-      document.getElementById('startBtn').disabled = false;
-      document.getElementById('stopBtn').disabled = true;
-      printLog("\n🎉🎉 اكتملت العمليات بالكامل! بالعافية والأكل الهني!");
-    };
+        if (isRunning) {
+          document.getElementById('status').innerText = "🎉 اكتمل السحب بنجاح!";
+          printLog("\n✨ اكتمل المسح التلقائي لموقع أزورا بالكامل!");
+        }
+
+      } catch (err) {
+        document.getElementById('status').innerText = "❌ حدث خطأ بالاتصال";
+        printLog(`❌ خطأ عام: ${err.message}`);
+      }
+    }
+
+    // تشغيل تلقائي بمجرد فتح الصفحة
+    window.addEventListener('DOMContentLoaded', () => {
+      runScraperEngine();
+    });
   </script>
 </body>
 </html>
