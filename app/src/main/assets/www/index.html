@@ -3,37 +3,27 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>الساحب الأسطوري المباشر - Azora Engine v6 🕷️</title>
+  <title>ساحب أزورا التلقائي 🚀</title>
   <style>
     :root { --main: #ff9800; --bg: #0b0b0e; --card: #16161a; --border: #26262e; }
     body { font-family: system-ui, -apple-system, sans-serif; background: var(--bg); color: #fff; padding: 15px; margin: 0; }
     .container { background: var(--card); padding: 20px; border-radius: 18px; max-width: 650px; margin: auto; border: 1px solid var(--border); box-shadow: 0 10px 30px rgba(0,0,0,0.9); }
     h2 { color: var(--main); text-align: center; margin: 0 0 10px; font-size: 22px; }
-    
     .status-badge { display: block; text-align: center; padding: 8px 15px; border-radius: 12px; font-size: 13px; font-weight: bold; background: #1f1a0e; color: var(--main); border: 1px solid var(--main); margin-bottom: 15px; }
-    
     .grid-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 15px; }
     .stat-card { background: #0e0e11; padding: 12px; border-radius: 10px; text-align: center; border: 1px solid var(--border); }
     .stat-card h3 { margin: 0; color: var(--main); font-size: 20px; }
     .stat-card p { margin: 3px 0 0; font-size: 11px; color: #888; }
-
     .progress-box { width: 100%; background: #222; height: 12px; border-radius: 6px; overflow: hidden; margin-bottom: 15px; border: 1px solid #333; }
     .progress-fill { width: 0%; height: 100%; background: linear-gradient(90deg, #ff9800, #ffb74d); transition: width 0.3s; }
-
-    .btn-group { display: flex; gap: 10px; margin-bottom: 15px; }
-    button { flex: 1; padding: 12px; border-radius: 10px; border: none; font-weight: bold; font-size: 14px; cursor: pointer; transition: 0.2s; }
-    button.stop { background: #e53935; color: #fff; }
-    button.start { background: var(--main); color: #000; }
-    button:disabled { opacity: 0.4; cursor: not-allowed; }
-
-    #logBox { font-size: 12px; color: #64b5f6; white-space: pre-line; text-align: right; background: #060608; padding: 12px; border-radius: 10px; height: 260px; overflow-y: auto; border: 1px solid var(--border); font-family: monospace; line-height: 1.6; }
+    #logBox { font-size: 12px; color: #64b5f6; white-space: pre-line; text-align: right; background: #060608; padding: 12px; border-radius: 10px; height: 280px; overflow-y: auto; border: 1px solid var(--border); font-family: monospace; line-height: 1.6; }
   </style>
 </head>
 <body>
 
   <div class="container">
-    <h2>ساحب أزورا العملاق (Azora Ultra v6) ⚡</h2>
-    <div class="status-badge" id="status">🚀 التشغيل التلقائي شغّال...</div>
+    <h2>ساحب أزورا (Port 8080) ⚡</h2>
+    <div class="status-badge" id="status">🚀 جاري الاتصال بالبروكسي...</div>
 
     <div class="grid-stats">
       <div class="stat-card"><h3 id="statManga">0</h3><p>أعمال جديدة</p></div>
@@ -43,12 +33,7 @@
 
     <div class="progress-box"><div class="progress-fill" id="pFill"></div></div>
 
-    <div class="btn-group">
-      <button id="stopBtn" class="stop" onclick="toggleEngine(false)">إيقاف مؤقت 🛑</button>
-      <button id="startBtn" class="start" onclick="toggleEngine(true)" disabled>استئناف العمل 🔄</button>
-    </div>
-
-    <div id="logBox">جاري الاتصال بسيرفر البروكسي وبدء مسح azorafly.com...</div>
+    <div id="logBox">بدء الاتصال بسيرفر البروكسي على port 8080...</div>
   </div>
 
   <script type="module">
@@ -68,11 +53,10 @@
     const db = getFirestore(app);
 
     const AZORA_BASE = "https://azorafly.com/";
-    const LOCAL_PROXY = "http://localhost:3000/fetch?url="; // رابط البروكسي مالتنا
+    // تم الضبط على البورت 8080 الخاص بتطبيقك
+    const LOCAL_PROXY = "http://localhost:8080/?url=";
 
-    let isRunning = true;
     let mangaCount = 0, chapCount = 0, imgCount = 0;
-
     const wait = ms => new Promise(res => setTimeout(res, ms));
 
     function printLog(txt) {
@@ -81,28 +65,6 @@
       b.scrollTop = b.scrollHeight;
     }
 
-    function setProgress(percent) {
-      document.getElementById('pFill').style.width = Math.min(percent, 100) + '%';
-    }
-
-    window.toggleEngine = function(state) {
-      isRunning = state;
-      document.getElementById('stopBtn').disabled = !state;
-      document.getElementById('startBtn').disabled = state;
-      document.getElementById('status').innerText = state ? "🔄 جاري السحب..." : "⏸️ متوقف مؤقتاً";
-      printLog(state ? "▶️ تم استئناف العمل." : "🛑 تم إيقاف الساحب.");
-      if (state) runScraperEngine();
-    };
-
-    async function fetchViaProxy(url) {
-      const fullUrl = `${LOCAL_PROXY}${encodeURIComponent(url)}`;
-      const res = await fetch(fullUrl);
-      if (!res.ok) throw new Error(`البروكسي رجّع خطأ (${res.status})`);
-      const text = await res.text();
-      return new DOMParser().parseFromString(text, 'text/html');
-    }
-
-    // تصليح روابط الصور المكسورة
     function fixImgUrl(rawSrc) {
       if (!rawSrc) return "";
       let src = rawSrc.trim();
@@ -111,59 +73,70 @@
       return src;
     }
 
+    async function fetchViaProxy(targetUrl) {
+      // تجربة أكثر من صيغة للطلب حسب طريقة برمجة البروكسي عندك
+      const endpoints = [
+        `http://localhost:8080/?url=${encodeURIComponent(targetUrl)}`,
+        `http://localhost:8080/fetch?url=${encodeURIComponent(targetUrl)}`,
+        `http://localhost:8080/${targetUrl}`
+      ];
+
+      for (let endpoint of endpoints) {
+        try {
+          const res = await fetch(endpoint);
+          if (res.ok) {
+            const text = await res.text();
+            if (text && text.length > 100) {
+              return new DOMParser().parseFromString(text, 'text/html');
+            }
+          }
+        } catch (e) {}
+      }
+      throw new Error("تطبيق البروكسي بـ 8080 رفض الطلب، تأكد أنه شغّال ويدعم CORS");
+    }
+
     async function runScraperEngine() {
-      printLog("🌐 جاري جلب الصفحة الرئيسية لموقع أزورا...");
+      printLog("🌐 جاري الاتصال بموقع أزورا عبر البروكسي (8080)...");
 
       try {
         const homeDoc = await fetchViaProxy(AZORA_BASE);
 
-        // جلب كل روابط الأعمال المتاحة بالصفحة
         const links = Array.from(homeDoc.querySelectorAll('a'))
           .map(a => a.href || a.getAttribute('href'))
           .filter(h => h && (h.includes('/series/') || h.includes('/manga/') || h.includes('/work/')));
 
         const uniqueLinks = [...new Set(links)];
-        printLog(`🎯 عثرنا على (${uniqueLinks.length}) مانهاوا في الرئيسية!`);
+        printLog(`🎯 عثرنا على (${uniqueLinks.length}) عمل بـ azorafly.com`);
 
         for (let i = 0; i < uniqueLinks.length; i++) {
-          if (!isRunning) break;
-
           let mUrl = uniqueLinks[i];
           if (!mUrl.startsWith('http')) mUrl = "https://azorafly.com" + (mUrl.startsWith('/') ? '' : '/') + mUrl;
 
-          printLog(`\n📖 [${i + 1}/${uniqueLinks.length}] معالجة: ${mUrl}`);
+          printLog(`\n📖 [${i + 1}/${uniqueLinks.length}] جاري معالجة: ${mUrl}`);
 
           try {
             const mDoc = await fetchViaProxy(mUrl);
 
-            // استخراج تفاصيل العمل الشاملة
-            const title = mDoc.querySelector('meta[property="og:title"]')?.content || mDoc.title || "عنوان أزورا";
-            const rawCover = mDoc.querySelector('meta[property="og:image"]')?.content || "";
-            const cover = fixImgUrl(rawCover);
+            const title = mDoc.querySelector('meta[property="og:title"]')?.content || mDoc.title || "عمل أزورا";
+            const cover = fixImgUrl(mDoc.querySelector('meta[property="og:image"]')?.content || "");
 
-            // استخراج الوصف/القصة والتصنيفات
-            const description = mDoc.querySelector('meta[name="description"]')?.content || mDoc.querySelector('.summary, .description, p')?.innerText?.trim() || "لا يوجد وصف";
-            const genres = Array.from(mDoc.querySelectorAll('a[href*="/genre/"]')).map(g => g.innerText.trim()).filter(Boolean);
-
-            // فحص تكرار العمل بـ Firebase
             const q = query(collection(db, "manga"), where("sourceUrl", "==", mUrl));
             const snap = await getDocs(q);
 
             let mangaId;
             if (!snap.empty) {
-              printLog(`  ⚠️ العمل محفوط سابقاً، جاري التحديث أو سحب الفصول الجديد...`);
+              printLog(`  ⚠️ العمل محفوظ سابقاً بـ Firebase.`);
               mangaId = snap.docs[0].id;
             } else {
               const docRef = await addDoc(collection(db, "manga"), {
-                title, cover, description, genres, sourceUrl: mUrl, sourceSite: "Azora", createdAt: serverTimestamp()
+                title, cover, sourceUrl: mUrl, sourceSite: "Azora", createdAt: serverTimestamp()
               });
               mangaId = docRef.id;
               mangaCount++;
               document.getElementById('statManga').innerText = mangaCount;
-              printLog(`  ✨ تم حفظ العمل: ${title}`);
+              printLog(`  ✨ تم الرفع: ${title}`);
             }
 
-            // استخراج الفصول
             const chAnchors = Array.from(mDoc.querySelectorAll('a'))
               .map(a => ({
                 url: a.href || a.getAttribute('href'),
@@ -177,18 +150,16 @@
               if (!uniqueChaps.some(x => x.url === fullChUrl)) uniqueChaps.push({ url: fullChUrl, txt: c.txt });
             });
 
-            printLog(`  └─ جاري سحب (${uniqueChaps.length}) فصل...`);
+            printLog(`  └─ وجدنا (${uniqueChaps.length}) فصل.`);
 
             for (let j = 0; j < uniqueChaps.length; j++) {
-              if (!isRunning) break;
               const ch = uniqueChaps[j];
-
               try {
                 const chDoc = await fetchViaProxy(ch.url);
                 const imgElements = Array.from(chDoc.querySelectorAll('img'));
                 
                 const rawImgs = imgElements.map(img => 
-                  img.getAttribute('data-src') || img.getAttribute('lazy-src') || img.src || img.getAttribute('data-lazy-src')
+                  img.getAttribute('data-src') || img.getAttribute('lazy-src') || img.src
                 ).filter(Boolean);
 
                 const validImgs = [...new Set(rawImgs)]
@@ -207,26 +178,23 @@
                 document.getElementById('statChaps').innerText = chapCount;
                 document.getElementById('statImgs').innerText = imgCount;
 
-                printLog(`     ├─ ✅ ${ch.txt || 'فصل'}: تم رفع ${validImgs.length} صورة`);
+                printLog(`     ├─ ✅ ${ch.txt || 'فصل'}: تم حفظ ${validImgs.length} صورة`);
               } catch (err) {
-                printLog(`     ├─ ❌ فشل الفصل: ${err.message}`);
+                printLog(`     ├─ ❌ خطأ بالفصل: ${err.message}`);
               }
-
-              await wait(300); // حماية للبروكسي والسيرفر
+              await wait(200);
             }
 
           } catch (err) {
             printLog(`  ❌ خطأ بـ ${mUrl}: ${err.message}`);
           }
 
-          setProgress(((i + 1) / uniqueLinks.length) * 100);
-          await wait(800);
+          document.getElementById('pFill').style.width = (((i + 1) / uniqueLinks.length) * 100) + '%';
+          await wait(500);
         }
 
-        if (isRunning) {
-          document.getElementById('status').innerText = "🎉 اكتمل السحب بنجاح!";
-          printLog("\n✨ اكتمل المسح التلقائي لموقع أزورا بالكامل!");
-        }
+        document.getElementById('status').innerText = "🎉 اكتمل السحب بنجاح!";
+        printLog("\n✨ اكتمل المسح التلقائي لموقع أزورا!");
 
       } catch (err) {
         document.getElementById('status').innerText = "❌ حدث خطأ بالاتصال";
@@ -234,10 +202,7 @@
       }
     }
 
-    // تشغيل تلقائي بمجرد فتح الصفحة
-    window.addEventListener('DOMContentLoaded', () => {
-      runScraperEngine();
-    });
+    window.addEventListener('DOMContentLoaded', runScraperEngine);
   </script>
 </body>
 </html>
