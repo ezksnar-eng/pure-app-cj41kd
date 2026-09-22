@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ساحب أزورا الشامل 🚀</title>
+  <title>ساحب أزورا التلقائي 🚀</title>
   <style>
     :root { --main: #ff9800; --bg: #0b0b0e; --card: #16161a; --border: #26262e; }
     body { font-family: system-ui, -apple-system, sans-serif; background: var(--bg); color: #fff; padding: 15px; margin: 0; }
@@ -22,7 +22,7 @@
 <body>
 
   <div class="container">
-    <h2>ساحب أزورا الشامل (Port 8080) ⚡</h2>
+    <h2>ساحب أزورا (Port 8080) ⚡</h2>
     <div class="status-badge" id="status">🚀 جاري الاتصال بالبروكسي...</div>
 
     <div class="grid-stats">
@@ -38,7 +38,7 @@
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-    import { getFirestore, collection, addDoc, doc, updateDoc, query, where, getDocs, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+    import { getFirestore, collection, addDoc, doc, setDoc, query, where, getDocs, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyBkaDrsjial5W6xyXPPt1-trJhR7E9n2p4",
@@ -52,7 +52,8 @@
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
 
-    const AZORA_BASE = "https://azorafly.com";
+    const AZORA_BASE = "https://azorafly.com/";
+
     let mangaCount = 0, chapCount = 0, imgCount = 0;
     const wait = ms => new Promise(res => setTimeout(res, ms));
 
@@ -62,20 +63,24 @@
       b.scrollTop = b.scrollHeight;
     }
 
-    function fixImgUrl(rawSrc) {
-      if (!rawSrc) return "";
-      let src = rawSrc.trim();
-      if (src.startsWith("//")) return "https:" + src;
-      if (src.startsWith("/")) return "https://azorafly.com" + src;
-      return src;
+    function cleanUrl(url) {
+      if (!url) return "";
+      let cleaned = url.trim();
+      if (cleaned.includes('androidplatform.net')) {
+        cleaned = cleaned.replace(/https?:\/\/appassets\.androidplatform\.net/g, 'https://azorafly.com');
+      }
+      if (cleaned.startsWith("//")) return "https:" + cleaned;
+      if (cleaned.startsWith("/")) return "https://azorafly.com" + cleaned;
+      if (!cleaned.startsWith("http")) return "https://azorafly.com/" + cleaned;
+      return cleaned;
     }
 
-    // بنفس دالة الكود القديم الشغال مالتك بالضبط مع تجربة الـ Endpoints
     async function fetchViaProxy(targetUrl) {
+      const safeUrl = cleanUrl(targetUrl);
       const endpoints = [
-        `http://localhost:8080/?url=${encodeURIComponent(targetUrl)}`,
-        `http://127.0.0.1:8080/?url=${encodeURIComponent(targetUrl)}`,
-        `http://localhost:8080/${targetUrl}`
+        `http://localhost:8080/?url=${encodeURIComponent(safeUrl)}`,
+        `http://localhost:8080/fetch?url=${encodeURIComponent(safeUrl)}`,
+        `http://localhost:8080/${safeUrl}`
       ];
 
       for (let endpoint of endpoints) {
@@ -83,146 +88,119 @@
           const res = await fetch(endpoint);
           if (res.ok) {
             const text = await res.text();
-            if (text && text.length > 50) {
+            if (text && text.length > 100) {
               return new DOMParser().parseFromString(text, 'text/html');
             }
           }
         } catch (e) {}
       }
-      throw new Error("تطبيق البروكسي بـ 8080 رفض الطلب أو لم يرجع بيانات");
+      throw new Error("تطبيق البروكسي بـ 8080 رفض الطلب، تأكد أنه شغّال ويدعم CORS");
     }
 
     async function runScraperEngine() {
-      printLog("🌐 بدء محرك السحب الشامل لجميع الأرشيف...");
-      document.getElementById('status').innerText = "⚡ السحب التلقائي قيد التشغيل...";
+      printLog("🌐 جاري الاتصال بموقع أزورا عبر البروكسي (8080)...");
 
-      let page = 1;
-      let hasMorePages = true;
+      try {
+        const homeDoc = await fetchViaProxy(AZORA_BASE);
 
-      while (hasMorePages) {
-        try {
-          // تجربة صفحة الأرشيف أو الصفحة الرئيسية بالأول
-          const pageUrl = page === 1 ? AZORA_BASE : `${AZORA_BASE}/manga?page=${page}`;
-          printLog(`\n🔎 جاري مسح الصفحة رقم [${page}]...`);
-          
-          const archiveDoc = await fetchViaProxy(pageUrl);
-          const links = Array.from(archiveDoc.querySelectorAll('a'))
-            .map(a => a.href || a.getAttribute('href'))
-            .filter(h => h && (h.includes('/series/') || h.includes('/manga/') || h.includes('/work/')));
+        const links = Array.from(homeDoc.querySelectorAll('a'))
+          .map(a => a.href || a.getAttribute('href'))
+          .filter(h => h && (h.includes('/series/') || h.includes('/manga/') || h.includes('/work/')));
 
-          const uniqueLinks = [...new Set(links)];
+        const uniqueLinks = [...new Set(links)].map(cleanUrl);
+        printLog(`🎯 عثرنا على (${uniqueLinks.length}) عمل بـ azorafly.com`);
 
-          if (uniqueLinks.length === 0) {
-            if (page > 1) {
-              printLog("🎉 تم سحب جميع الصفحات بالكامل!");
-              hasMorePages = false;
-              break;
+        for (let i = 0; i < uniqueLinks.length; i++) {
+          let mUrl = uniqueLinks[i];
+
+          printLog(`\n📖 [${i + 1}/${uniqueLinks.length}] جاري معالجة: ${mUrl}`);
+
+          try {
+            const mDoc = await fetchViaProxy(mUrl);
+
+            const title = mDoc.querySelector('meta[property="og:title"]')?.content || mDoc.title || "عمل أزورا";
+            const cover = cleanUrl(mDoc.querySelector('meta[property="og:image"]')?.content || "");
+
+            const q = query(collection(db, "manga"), where("sourceUrl", "==", mUrl));
+            const snap = await getDocs(q);
+
+            let mangaId;
+            if (!snap.empty) {
+              printLog(`  ⚠️ العمل محفوظ سابقاً بـ Firebase.`);
+              mangaId = snap.docs[0].id;
             } else {
-              printLog("⚠️ لم نجد روابط بالصفحة الرئيسية، تجربة رابط الأرشيف المباشر...");
+              const docRef = await addDoc(collection(db, "manga"), {
+                title, cover, sourceUrl: mUrl, sourceSite: "Azora", createdAt: serverTimestamp()
+              });
+              mangaId = docRef.id;
+              mangaCount++;
+              document.getElementById('statManga').innerText = mangaCount;
+              printLog(`  ✨ تم الرفع: ${title}`);
             }
-          } else {
-            printLog(`🎯 عثرنا على (${uniqueLinks.length}) عمل بالصفحة [${page}]`);
 
-            for (let i = 0; i < uniqueLinks.length; i++) {
-              let mUrl = uniqueLinks[i];
-              if (!mUrl.startsWith('http')) mUrl = AZORA_BASE + (mUrl.startsWith('/') ? '' : '/') + mUrl;
+            const chAnchors = Array.from(mDoc.querySelectorAll('a'))
+              .map(a => ({
+                url: cleanUrl(a.href || a.getAttribute('href')),
+                txt: a.innerText.trim()
+              }))
+              .filter(c => c.url && (c.url.includes('chapter') || c.url.includes('/ch-') || c.txt.includes('فصل')));
 
-              printLog(`\n📖 [صفحة ${page} - عمل ${i + 1}/${uniqueLinks.length}] معالجة: ${mUrl}`);
+            const uniqueChaps = [];
+            chAnchors.forEach(c => {
+              if (!uniqueChaps.some(x => x.url === c.url)) uniqueChaps.push(c);
+            });
 
+            printLog(`  └─ وجدنا (${uniqueChaps.length}) فصل.`);
+
+            for (let j = 0; j < uniqueChaps.length; j++) {
+              const ch = uniqueChaps[j];
               try {
-                const mDoc = await fetchViaProxy(mUrl);
-                const title = mDoc.querySelector('meta[property="og:title"]')?.content || mDoc.title || "عمل أزورا";
-                const cover = fixImgUrl(mDoc.querySelector('meta[property="og:image"]')?.content || "");
+                const chDoc = await fetchViaProxy(ch.url);
+                const imgElements = Array.from(chDoc.querySelectorAll('img'));
+                
+                const rawImgs = imgElements.map(img => 
+                  img.getAttribute('data-src') || img.getAttribute('lazy-src') || img.src
+                ).filter(Boolean);
 
-                const q = query(collection(db, "manga"), where("sourceUrl", "==", mUrl));
-                const snap = await getDocs(q);
+                const validImgs = [...new Set(rawImgs)]
+                  .map(cleanUrl)
+                  .filter(src => src && (src.includes('.jpg') || src.includes('.png') || src.includes('.webp') || src.includes('uploads')));
 
-                let mangaId;
-                if (!snap.empty) {
-                  mangaId = snap.docs[0].id;
-                  printLog(`  ⚠️ العمل محفوظ سابقاً، يجري التحديث...`);
-                  await updateDoc(doc(db, "manga", mangaId), { updatedAt: serverTimestamp() });
-                } else {
-                  const docRef = await addDoc(collection(db, "manga"), {
-                    title, cover, sourceUrl: mUrl, sourceSite: "Azora", createdAt: serverTimestamp()
-                  });
-                  mangaId = docRef.id;
-                  mangaCount++;
-                  document.getElementById('statManga').innerText = mangaCount;
-                  printLog(`  ✨ تم الرفع: ${title}`);
-                }
-
-                const chAnchors = Array.from(mDoc.querySelectorAll('a'))
-                  .map(a => ({
-                    url: a.href || a.getAttribute('href'),
-                    txt: a.innerText.trim()
-                  }))
-                  .filter(c => c.url && (c.url.includes('chapter') || c.url.includes('/ch-') || c.txt.includes('فصل')));
-
-                const uniqueChaps = [];
-                chAnchors.forEach(c => {
-                  let fullChUrl = c.url.startsWith('http') ? c.url : AZORA_BASE + (c.url.startsWith('/') ? '' : '/') + c.url;
-                  if (!uniqueChaps.some(x => x.url === fullChUrl)) uniqueChaps.push({ url: fullChUrl, txt: c.txt });
+                // تعديل اسم الـ ID واستخدام addDoc لتفادي خطأ المستند الموجود سابقاً
+                await addDoc(collection(db, `manga/${mangaId}/chapters`), {
+                  title: ch.txt || `فصل ${j + 1}`,
+                  sourceUrl: ch.url,
+                  images: validImgs,
+                  order: j + 1
                 });
 
-                printLog(`  └─ وجدنا (${uniqueChaps.length}) فصل.`);
+                chapCount++;
+                imgCount += validImgs.length;
+                document.getElementById('statChaps').innerText = chapCount;
+                document.getElementById('statImgs').innerText = imgCount;
 
-                const chSnap = await getDocs(collection(db, `manga/${mangaId}/chapters`));
-                const existingChUrls = chSnap.docs.map(d => d.data().sourceUrl);
-
-                for (let j = 0; j < uniqueChaps.length; j++) {
-                  const ch = uniqueChaps[j];
-                  if (existingChUrls.includes(ch.url)) continue;
-
-                  try {
-                    const chDoc = await fetchViaProxy(ch.url);
-                    const imgElements = Array.from(chDoc.querySelectorAll('img'));
-                    
-                    const rawImgs = imgElements.map(img => 
-                      img.getAttribute('data-src') || img.getAttribute('lazy-src') || img.src
-                    ).filter(Boolean);
-
-                    const validImgs = [...new Set(rawImgs)]
-                      .map(fixImgUrl)
-                      .filter(src => src && (src.includes('.jpg') || src.includes('.png') || src.includes('.webp') || src.includes('uploads')));
-
-                    await addDoc(collection(db, `manga/${mangaId}/chapters`), {
-                      title: ch.txt || `فصل ${j + 1}`,
-                      sourceUrl: ch.url,
-                      images: validImgs,
-                      order: j + 1
-                    });
-
-                    chapCount++;
-                    imgCount += validImgs.length;
-                    document.getElementById('statChaps').innerText = chapCount;
-                    document.getElementById('statImgs').innerText = imgCount;
-
-                    printLog(`     ├─ ✅ ${ch.txt || 'فصل'}: تم حفظ ${validImgs.length} صورة`);
-                  } catch (err) {
-                    printLog(`     ├─ ❌ خطأ بالفصل: ${err.message}`);
-                  }
-                  await wait(200);
-                }
-
+                printLog(`     ├─ ✅ ${ch.txt || 'فصل'}: تم حفظ ${validImgs.length} صورة`);
               } catch (err) {
-                printLog(`  ❌ خطأ بـ ${mUrl}: ${err.message}`);
+                printLog(`     ├─ ❌ خطأ بالفصل: ${err.message}`);
               }
-
-              document.getElementById('pFill').style.width = (((i + 1) / uniqueLinks.length) * 100) + '%';
-              await wait(400);
+              await wait(200);
             }
+
+          } catch (err) {
+            printLog(`  ❌ خطأ بـ ${mUrl}: ${err.message}`);
           }
 
-          page++;
-        } catch (err) {
-          printLog(`❌ خطأ بمسح الصفحة ${page}: ${err.message}`);
-          page++;
-          await wait(2000);
+          document.getElementById('pFill').style.width = (((i + 1) / uniqueLinks.length) * 100) + '%';
+          await wait(500);
         }
-      }
 
-      document.getElementById('status').innerText = "🎉 اكتمل السحب بنجاح!";
+        document.getElementById('status').innerText = "🎉 اكتمل السحب بنجاح!";
+        printLog("\n✨ اكتمل المسح التلقائي لموقع أزورا!");
+
+      } catch (err) {
+        document.getElementById('status').innerText = "❌ حدث خطأ بالاتصال";
+        printLog(`❌ خطأ عام: ${err.message}`);
+      }
     }
 
     window.addEventListener('DOMContentLoaded', runScraperEngine);
