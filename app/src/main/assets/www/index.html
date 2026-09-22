@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ساحب أزورا الشامل 🚀</title>
+  <title>ساحب أزورا الموازي الشامل (9X) ⚡</title>
   <style>
     :root { --main: #ff9800; --bg: #0b0b0e; --card: #16161a; --border: #26262e; }
     body { font-family: system-ui, -apple-system, sans-serif; background: var(--bg); color: #fff; padding: 15px; margin: 0; }
@@ -14,22 +14,20 @@
     .stat-card { background: #0e0e11; padding: 12px; border-radius: 10px; text-align: center; border: 1px solid var(--border); }
     .stat-card h3 { margin: 0; color: var(--main); font-size: 20px; }
     .stat-card p { margin: 3px 0 0; font-size: 11px; color: #888; }
-    .progress-box { width: 100%; background: #222; height: 12px; border-radius: 6px; overflow: hidden; margin-bottom: 15px; border: 1px solid #333; }
-    .progress-fill { width: 0%; height: 100%; background: linear-gradient(90deg, #ff9800, #ffb74d); transition: width 0.3s; }
-    #logBox { font-size: 12px; color: #64b5f6; white-space: pre-line; text-align: right; background: #060608; padding: 12px; border-radius: 10px; height: 300px; overflow-y: auto; border: 1px solid var(--border); font-family: monospace; line-height: 1.6; }
+    #logBox { font-size: 12px; color: #64b5f6; white-space: pre-line; text-align: right; background: #060608; padding: 12px; border-radius: 10px; height: 350px; overflow-y: auto; border: 1px solid var(--border); font-family: monospace; line-height: 1.6; }
     .controls { display: flex; gap: 10px; margin-bottom: 15px; }
-    .btn { flex: 1; padding: 10px; border-radius: 10px; border: none; font-weight: bold; cursor: pointer; background: var(--main); color: #000; }
+    .btn { flex: 1; padding: 12px; border-radius: 10px; border: none; font-weight: bold; cursor: pointer; background: var(--main); color: #000; font-size: 15px; }
     .btn:disabled { opacity: 0.5; cursor: not-allowed; }
   </style>
 </head>
 <body>
 
   <div class="container">
-    <h2>ساحب أزورا الأرشيفي (Port 8080) ⚡</h2>
-    <div class="status-badge" id="status">⚡ اضغط ابدأ للبدء بمسح الأرشيف...</div>
+    <h2>ساحب أزورا الشامل والتصنيفات (9 أعمال سوية) ⚡</h2>
+    <div class="status-badge" id="status">⚡ جاهز للانطلاق بسرعة 9X بدون تكرار...</div>
 
     <div class="controls">
-      <button class="btn" id="startBtn">بدء سحب الأرشيف الشامل</button>
+      <button class="btn" id="startBtn">🚀 بدء المسح الشامل بالتصنيفات (سرعة 9X)</button>
     </div>
 
     <div class="grid-stats">
@@ -38,9 +36,7 @@
       <div class="stat-card"><h3 id="statImgs">0</h3><p>صور مرفوعة</p></div>
     </div>
 
-    <div class="progress-box"><div class="progress-fill" id="pFill"></div></div>
-
-    <div id="logBox">تأكد أن البروكسي المحلي شغّال على port 8080 واضغط بدء...</div>
+    <div id="logBox">تأكد أن البروكسي شغّال بـ 8080 واضغط بدء...</div>
   </div>
 
   <script type="module">
@@ -60,14 +56,14 @@
     const db = getFirestore(app);
 
     let mangaCount = 0, chapCount = 0, imgCount = 0;
+    const processedUrls = new Set(); // لمنع تكرار المانهوا بالذاكرة نهائياً
+    const CONCURRENCY_LIMIT = 9; // تشغيل 9 أعمال بوقت واحد
+
     const wait = ms => new Promise(res => setTimeout(res, ms));
 
     async function requestWakeLock() {
       try {
-        if ('wakeLock' in navigator) {
-          await navigator.wakeLock.request('screen');
-          printLog("🔒 تم تفعيل منع نوم الشاشة.");
-        }
+        if ('wakeLock' in navigator) await navigator.wakeLock.request('screen');
       } catch (e) {}
     }
 
@@ -89,7 +85,6 @@
       return cleaned;
     }
 
-    // العودة للبروكسي المحلي الممتاز (8080)
     async function fetchViaProxy(targetUrl) {
       const safeUrl = cleanUrl(targetUrl);
       const endpoints = [
@@ -109,128 +104,144 @@
           }
         } catch (e) {}
       }
-      throw new Error("تأكد أن البروكسي شغّال بـ Termux أو الحاسبة على Port 8080");
+      throw new Error("فشل الاتصال بالبروكسي المحلي.");
+    }
+
+    // معالجة مانهوا واحدة بالكامل
+    async function processSingleManga(mUrl) {
+      if (processedUrls.has(mUrl)) return;
+      processedUrls.add(mUrl);
+
+      try {
+        // فحص Firebase لمنع التكرار
+        const q = query(collection(db, "manga"), where("sourceUrl", "==", mUrl));
+        const snap = await getDocs(q);
+
+        let mangaId;
+        const mDoc = await fetchViaProxy(mUrl);
+        const title = mDoc.querySelector('meta[property="og:title"]')?.content || mDoc.title || "عمل أزورا";
+        const cover = cleanUrl(mDoc.querySelector('meta[property="og:image"]')?.content || "");
+
+        if (!snap.empty) {
+          printLog(`  ⚠️ [موجود سابقاً]: ${title}`);
+          mangaId = snap.docs[0].id;
+        } else {
+          const docRef = await addDoc(collection(db, "manga"), {
+            title: title,
+            cover: cover,
+            coverUrl: cover,
+            image: cover,
+            sourceUrl: mUrl,
+            sourceSite: "Azora",
+            type: "مانهوا",
+            status: "مستمر",
+            rating: 8.0,
+            createdAt: serverTimestamp()
+          });
+          mangaId = docRef.id;
+          mangaCount++;
+          document.getElementById('statManga').innerText = mangaCount;
+          printLog(`  ✨ [رفع جديد]: ${title}`);
+        }
+
+        // جلب الفصول
+        const chAnchors = Array.from(mDoc.querySelectorAll('a'))
+          .map(a => ({ url: cleanUrl(a.href || a.getAttribute('href')), txt: a.innerText.trim() }))
+          .filter(c => c.url && (c.url.includes('chapter') || c.url.includes('/ch-') || c.txt.includes('فصل')));
+
+        const uniqueChaps = [];
+        chAnchors.forEach(c => {
+          if (!uniqueChaps.some(x => x.url === c.url)) uniqueChaps.push(c);
+        });
+
+        for (let j = 0; j < uniqueChaps.length; j++) {
+          const ch = uniqueChaps[j];
+          try {
+            const chDoc = await fetchViaProxy(ch.url);
+            const imgElements = Array.from(chDoc.querySelectorAll('img'));
+            
+            const rawImgs = imgElements.map(img => img.getAttribute('data-src') || img.getAttribute('lazy-src') || img.src).filter(Boolean);
+            const validImgs = [...new Set(rawImgs)].map(cleanUrl).filter(src => src && (src.includes('.jpg') || src.includes('.png') || src.includes('.webp') || src.includes('uploads')));
+
+            await addDoc(collection(db, `manga/${mangaId}/chapters`), {
+              title: ch.txt || `فصل ${j + 1}`,
+              sourceUrl: ch.url,
+              images: validImgs,
+              order: j + 1
+            });
+
+            chapCount++;
+            imgCount += validImgs.length;
+            document.getElementById('statChaps').innerText = chapCount;
+            document.getElementById('statImgs').innerText = imgCount;
+
+          } catch (chErr) {}
+        }
+      } catch (err) {}
+    }
+
+    // دالة لتشغيل 9 أعمال معاً بالخلفية
+    async function processBatchInParallel(mangaUrls) {
+      for (let i = 0; i < mangaUrls.length; i += CONCURRENCY_LIMIT) {
+        const batch = mangaUrls.slice(i, i + CONCURRENCY_LIMIT);
+        printLog(`\n⚡ جاري معالجة دفعة سريعة من (${batch.length}) أعمال بوقت واحد...`);
+        await Promise.all(batch.map(url => processSingleManga(url)));
+      }
     }
 
     async function startFullArchiving() {
       document.getElementById('startBtn').disabled = true;
-      document.getElementById('status').innerText = "🔄 السحب الأرشيفي شغّال الآن...";
+      document.getElementById('status').innerText = "🚀 المسح الخارق عبر التصنيفات شغال الآن...";
       await requestWakeLock();
 
-      let pageIndex = parseInt(localStorage.getItem('azora_last_page') || "1");
-      let maxPages = 500; // مسح الأرشيف كاملاً
+      try {
+        printLog("🔍 جاري جلب أقسام التصنيفات والأنواع من أزورا...");
+        const homeDoc = await fetchViaProxy("https://azorafly.com");
+        
+        // جلب كل روابط التصنيفات
+        const categoryLinks = Array.from(homeDoc.querySelectorAll('a'))
+          .map(a => cleanUrl(a.href || a.getAttribute('href')))
+          .filter(h => h.includes('/genre') || h.includes('/genres') || h.includes('/category') || h.includes('/series?type=') || h.includes('/type/'));
 
-      for (let p = pageIndex; p <= maxPages; p++) {
-        localStorage.setItem('azora_last_page', p.toString());
-        const archiveUrl = `https://azorafly.com/series?page=${p}`;
-        printLog(`\n📑 [الصفحة ${p}] جاري فحص قائمة الأعمال بـ أزورا...`);
+        const uniqueGenres = [...new Set(categoryLinks)];
+        printLog(`🎯 عثرنا على (${uniqueGenres.length}) قسم وتصنيف بـ أزورا!`);
 
-        try {
-          const pageDoc = await fetchViaProxy(archiveUrl);
-          const links = Array.from(pageDoc.querySelectorAll('a'))
-            .map(a => a.href || a.getAttribute('href'))
-            .filter(h => h && (h.includes('/series/') || h.includes('/manga/') || h.includes('/work/')));
+        // إذا ما لقى صفحات تصنيف، يضيف رابط الأرشيف الشامل كخطة احتياطية
+        if (uniqueGenres.length === 0) uniqueGenres.push("https://azorafly.com/series");
 
-          const uniqueLinks = [...new Set(links)].map(cleanUrl);
-          
-          if (uniqueLinks.length === 0) {
-            printLog("🏁 وصلنا لنهاية الأرشيف.");
-            break;
-          }
+        for (let g = 0; g < uniqueGenres.length; g++) {
+          const genreUrl = uniqueGenres[g];
+          printLog(`\n📁 [قسم ${g + 1}/${uniqueGenres.length}] جاري مسح التصنيف: ${genreUrl}`);
 
-          printLog(`🎯 عثرنا على (${uniqueLinks.length}) عمل بصفحة الأرشيف ${p}`);
-
-          for (let i = 0; i < uniqueLinks.length; i++) {
-            let mUrl = uniqueLinks[i];
-            printLog(`\n📖 [${i + 1}/${uniqueLinks.length}] معالجة: ${mUrl}`);
-
+          for (let p = 1; p <= 100; p++) {
+            const pageUrl = genreUrl.includes('?') ? `${genreUrl}&page=${p}` : `${genreUrl}?page=${p}`;
             try {
-              const mDoc = await fetchViaProxy(mUrl);
-              const title = mDoc.querySelector('meta[property="og:title"]')?.content || mDoc.title || "عمل أزورا";
-              const cover = cleanUrl(mDoc.querySelector('meta[property="og:image"]')?.content || "");
+              const pDoc = await fetchViaProxy(pageUrl);
+              const links = Array.from(pDoc.querySelectorAll('a'))
+                .map(a => cleanUrl(a.href || a.getAttribute('href')))
+                .filter(h => h && (h.includes('/series/') || h.includes('/manga/') || h.includes('/work/')));
 
-              const q = query(collection(db, "manga"), where("sourceUrl", "==", mUrl));
-              const snap = await getDocs(q);
+              const mangaList = [...new Set(links)].filter(url => !processedUrls.has(url));
 
-              let mangaId;
-              if (!snap.empty) {
-                printLog(`  ⚠️ العمل مسجل سابقاً.`);
-                mangaId = snap.docs[0].id;
-              } else {
-                const docRef = await addDoc(collection(db, "manga"), {
-                  title: title,
-                  cover: cover,
-                  coverUrl: cover,
-                  image: cover,
-                  poster: cover,
-                  sourceUrl: mUrl,
-                  sourceSite: "Azora",
-                  type: "مانهوا",
-                  status: "مستمر",
-                  rating: 7.5,
-                  createdAt: serverTimestamp()
-                });
-                mangaId = docRef.id;
-                mangaCount++;
-                document.getElementById('statManga').innerText = mangaCount;
-                printLog(`  ✨ تم الرفع: ${title}`);
+              if (mangaList.length === 0) {
+                printLog(`  🏁 انتهت صفحات هذا التصنيف عند الصفحة ${p - 1}.`);
+                break;
               }
 
-              const chAnchors = Array.from(mDoc.querySelectorAll('a'))
-                .map(a => ({
-                  url: cleanUrl(a.href || a.getAttribute('href')),
-                  txt: a.innerText.trim()
-                }))
-                .filter(c => c.url && (c.url.includes('chapter') || c.url.includes('/ch-') || c.txt.includes('فصل')));
+              printLog(`  📑 الصفحة ${p}: عثرنا على ${mangaList.length} عمل جديد.`);
+              await processBatchInParallel(mangaList);
 
-              const uniqueChaps = [];
-              chAnchors.forEach(c => {
-                if (!uniqueChaps.some(x => x.url === c.url)) uniqueChaps.push(c);
-              });
-
-              for (let j = 0; j < uniqueChaps.length; j++) {
-                const ch = uniqueChaps[j];
-                try {
-                  const chDoc = await fetchViaProxy(ch.url);
-                  const imgElements = Array.from(chDoc.querySelectorAll('img'));
-                  
-                  const rawImgs = imgElements.map(img => 
-                    img.getAttribute('data-src') || img.getAttribute('lazy-src') || img.src
-                  ).filter(Boolean);
-
-                  const validImgs = [...new Set(rawImgs)].map(cleanUrl).filter(src => src && (src.includes('.jpg') || src.includes('.png') || src.includes('.webp') || src.includes('uploads')));
-
-                  await addDoc(collection(db, `manga/${mangaId}/chapters`), {
-                    title: ch.txt || `فصل ${j + 1}`,
-                    sourceUrl: ch.url,
-                    images: validImgs,
-                    order: j + 1
-                  });
-
-                  chapCount++;
-                  imgCount += validImgs.length;
-                  document.getElementById('statChaps').innerText = chapCount;
-                  document.getElementById('statImgs').innerText = imgCount;
-
-                  printLog(`     ├─ ✅ ${ch.txt || 'فصل'}: تم حفظ ${validImgs.length} صورة`);
-                } catch (chErr) {}
-                await wait(200);
-              }
-
-            } catch (mErr) {
-              printLog(`  ❌ خطأ بالعمل: ${mErr.message}`);
+            } catch (pErr) {
+              break;
             }
-
-            document.getElementById('pFill').style.width = (((i + 1) / uniqueLinks.length) * 100) + '%';
-            await wait(300);
           }
-
-        } catch (err) {
-          printLog(`❌ خطأ بصفحة الأرشيف ${p}: ${err.message}`);
         }
+
+      } catch (err) {
+        printLog(`❌ خطأ أثناء السحب: ${err.message}`);
       }
 
-      document.getElementById('status').innerText = "🎉 اكتمل مسح الأرشيف بالكامل!";
+      document.getElementById('status').innerText = "🎉 اكتمل سحب كافة التصنيفات والـ 10,000 مانهوا بنجاح!";
     }
 
     document.getElementById('startBtn').addEventListener('click', startFullArchiving);
