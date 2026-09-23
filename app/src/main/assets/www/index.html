@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>تطبيق السحب والتنظيف</title>
+    <title>تطبيق السحب والتنظيف - Pure Library</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { background-color: #121212; color: #fff; font-family: sans-serif; padding: 20px; }
@@ -16,21 +16,17 @@
         .btn-clean { background: #ab47bc; color: #fff; }
         #logBox { background: #000; border: 1px solid #222; padding: 10px; border-radius: 5px; height: 250px; overflow-y: auto; font-family: monospace; font-size: 12px; color: #00ff66; }
     </style>
-
-    <!-- تحميل مكتبات Firebase تلقائياً عبر CDN -->
-    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 </head>
 <body>
 
 <div class="container">
-    <h1>🤖 تطبيق السحب والتنظيف (HTML)</h1>
+    <h1>🤖 تطبيق السحب والتنظيف (Pure Library)</h1>
 
     <div class="card">
         <label style="display:block; margin-bottom: 8px;">رابط المانجا / الفصل:</label>
         <input type="text" id="targetUrl" placeholder="ضع الرابط هنا...">
-        <button class="btn-scrape" onclick="startScraper()">🚀 بدء السحب عبر البروكسي</button>
-        <button class="btn-clean" onclick="cleanDuplicates()">🧹 تنظيف المكررات من القاعدة</button>
+        <button class="btn-scrape" id="btnScrape">🚀 بدء السحب عبر البروكسي</button>
+        <button class="btn-clean" id="btnClean">🧹 تنظيف المكررات من القاعدة</button>
     </div>
 
     <div class="card">
@@ -39,132 +35,149 @@
     </div>
 </div>
 
-<script>
-    // 1. ضع معلومات مشروع الفايربيس هنا
-    const firebaseConfig = {
-        apiKey: "YOUR_API_KEY",
-        authDomain: "YOUR_PROJECT.firebaseapp.com",
-        projectId: "YOUR_PROJECT_ID",
-        storageBucket: "YOUR_PROJECT.appspot.com",
-        messagingSenderId: "YOUR_SENDER_ID",
-        appId: "YOUR_APP_ID"
-    };
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+  import { 
+    getFirestore, collection, doc, setDoc, getDocs, deleteDoc, serverTimestamp 
+  } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-    // تهيئة الفايربيس
-    firebase.initializeApp(firebaseConfig);
-    const db = firebase.firestore();
+  // 1. إعدادات الفايربيس المباشرة لمشروعك
+  const firebaseConfig = {
+    apiKey: "AIzaSyBkaDrsjial5W6xyXPPt1-trJhR7E9n2p4",
+    authDomain: "pure-library-2d45d.firebaseapp.com",
+    projectId: "pure-library-2d45d",
+    storageBucket: "pure-library-2d45d.firebasestorage.app",
+    messagingSenderId: "953898341477",
+    appId: "1:953898341477:web:85409f5597f894ff13e28c",
+    measurementId: "G-YS8VFDXVKZ"
+  };
 
-    const PROXY_URL = "http://127.0.0.1:8080";
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
 
-    function log(msg) {
-        const box = document.getElementById('logBox');
-        box.innerHTML += `<br>[${new Date().toLocaleTimeString()}] ${msg}`;
-        box.scrollTop = box.scrollHeight;
-    }
+  const PROXY_URL = "http://127.0.0.1:8080";
 
-    async function fetchViaProxy(url) {
-        try {
-            const response = await fetch(PROXY_URL, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ url: url })
-            });
-            const data = await response.json();
-            if (data.status === 'success') return data.html;
-            log(`❌ خطأ من البروكسي: ${data.message}`);
-        } catch (err) {
-            log(`❌ فشل الاتصال بالبروكسي (تأكد إنه شغال): ${err.message}`);
-        }
-        return null;
-    }
+  function log(msg) {
+      const box = document.getElementById('logBox');
+      box.innerHTML += `<br>[${new Date().toLocaleTimeString()}] ${msg}`;
+      box.scrollTop = box.scrollHeight;
+  }
 
-    function cleanChapterName(text) {
-        const match = text.match(/(?:الفصل|chapter)\s*(\d+(?:\.\d+)?)/i);
-        return match ? `الفصل ${match[1]}` : text.trim();
-    }
+  async function fetchViaProxy(url) {
+      try {
+          const response = await fetch(PROXY_URL, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ url: url })
+          });
+          const data = await response.json();
+          if (data.status === 'success') return data.html;
+          log(`❌ خطأ من البروكسي: ${data.message}`);
+      } catch (err) {
+          log(`❌ فشل الاتصال بالبروكسي: ${err.message}`);
+      }
+      return null;
+  }
 
-    async function startScraper() {
-        const url = document.getElementById('targetUrl').value.trim();
-        if (!url) return alert('أدخل الرابط أولاً يمعود!');
+  function cleanChapterName(text) {
+      const match = text.match(/(?:الفصل|chapter)\s*(\d+(?:\.\d+)?)/i);
+      return match ? `الفصل ${match[1]}` : text.trim();
+  }
 
-        log(`🚀 جاري جلب الصفحة عبر البروكسي...`);
-        const html = await fetchViaProxy(url);
-        if (!html) return;
+  async function startScraper() {
+      const url = document.getElementById('targetUrl').value.trim();
+      if (!url) return alert('أدخل الرابط أولاً يمعود!');
 
-        const parser = new DOMParser();
-        const doc = parser.parseFromString(html, 'text/html');
+      log(`🚀 جاري جلب الصفحة عبر البروكسي...`);
+      const html = await fetchViaProxy(url);
+      if (!html) return;
 
-        const titleEl = doc.querySelector('h1.entry-title, h1.tit, div.post-title h1, h1');
-        if (!titleEl) return log('❌ لم يتم العثور على عنوان المانجا.');
+      const parser = new DOMParser();
+      const docPage = parser.parseFromString(html, 'text/html');
 
-        const mangaTitle = titleEl.textContent.trim();
-        const docId = mangaTitle.replace(/[^a-zA-Z0-9_]/g, '_');
-        const mangaRef = db.collection('manga').doc(docId);
+      const titleEl = docPage.querySelector('h1.entry-title, h1.tit, div.post-title h1, h1');
+      if (!titleEl) return log('❌ لم يتم العثور على عنوان المانجا.');
 
-        await mangaRef.set({
-            title: mangaTitle,
-            source_url: url,
-            updated_at: firebase.firestore.FieldValue.serverTimestamp()
-        }, { merge: true });
+      const mangaTitle = titleEl.textContent.trim();
+      const docId = mangaTitle.replace(/[^a-zA-Z0-9_]/g, '_');
+      const mangaRef = doc(db, 'manga', docId);
 
-        const links = Array.from(doc.querySelectorAll('a'));
-        const chapters = [];
+      await setDoc(mangaRef, {
+          title: mangaTitle,
+          source_url: url,
+          updated_at: serverTimestamp()
+      }, { merge: true });
 
-        links.forEach(a => {
-            const href = a.getAttribute('href');
-            const text = a.textContent.trim();
-            if (href && (href.toLowerCase().includes('chapter') || text.includes('فصل') || text.toLowerCase().includes('chapter'))) {
-                chapters.push({ title: cleanChapterName(text), url: href });
-            }
-        });
+      const links = Array.from(docPage.querySelectorAll('a'));
+      const chapters = [];
 
-        log(`📦 تم العثور على ${chapters.length} فصل. جاري التحميل...`);
+      links.forEach(a => {
+          const href = a.getAttribute('href');
+          const text = a.textContent.trim();
+          if (href && (href.toLowerCase().includes('chapter') || text.includes('فصل') || text.toLowerCase().includes('chapter'))) {
+              chapters.push({ title: cleanChapterName(text), url: href });
+          }
+      });
 
-        for (const ch of chapters) {
-            const chHtml = await fetchViaProxy(ch.url);
-            if (chHtml) {
-                const chDoc = parser.parseFromString(chHtml, 'text/html');
-                const imgs = Array.from(chDoc.querySelectorAll('div.reader-area img, div#readerarea img, img'));
-                const images = imgs.map(i => i.getAttribute('data-src') || i.getAttribute('src'))
-                                   .filter(i => i && !i.includes('logo') && !i.includes('avatar'));
+      log(`📦 تم العثور على ${chapters.length} فصل. جاري التحميل...`);
 
-                if (images.length > 0) {
-                    const chDocId = ch.title.replace(/[^a-zA-Z0-9]/g, '_');
-                    await mangaRef.collection('chapters').doc(chDocId).set({
-                        title: ch.title,
-                        images: images,
-                        url: ch.url,
-                        updated_at: firebase.firestore.FieldValue.serverTimestamp()
-                    }, { merge: true });
-                    log(`  └─ ✅ تم سحب: ${ch.title} (${images.length} صورة)`);
-                }
-            }
-        }
-        log(`🎉 اكتمل سحب ${mangaTitle} بنجاح!`);
-    }
+      for (const ch of chapters) {
+          const chHtml = await fetchViaProxy(ch.url);
+          if (chHtml) {
+              const chDoc = parser.parseFromString(chHtml, 'text/html');
+              const imgs = Array.from(chDoc.querySelectorAll('div.reader-area img, div#readerarea img, img'));
+              const images = imgs.map(i => i.getAttribute('data-src') || i.getAttribute('src'))
+                                 .filter(i => i && !i.includes('logo') && !i.includes('avatar'));
 
-    async function cleanDuplicates() {
-        log('🧹 جاري فحص وتنظيف المكررات من الفايربيس...');
-        const snapshot = await db.collection('manga').get();
-        const seenKeys = new Set();
-        let deleted = 0;
+              if (images.length > 0) {
+                  const chDocId = ch.title.replace(/[^a-zA-Z0-9]/g, '_');
+                  const chRef = doc(db, 'manga', docId, 'chapters', chDocId);
+                  
+                  await setDoc(chRef, {
+                      title: ch.title,
+                      images: images,
+                      url: ch.url,
+                      updated_at: serverTimestamp()
+                  }, { merge: true });
+                  log(`  └─ ✅ تم سحب: ${ch.title} (${images.length} صورة)`);
+              }
+          }
+      }
+      log(`🎉 اكتمل سحب ${mangaTitle} بنجاح!`);
+  }
 
-        for (const doc of snapshot.docs) {
-            const data = doc.data();
-            const cleanTitle = (data.title || '').replace(/[^a-zA-Z0-9أ-ي]/g, '').toLowerCase();
-            const key = data.source_url || cleanTitle;
+  async function cleanDuplicates() {
+      log('🧹 جاري فحص وتنظيف المكررات من الفايربيس...');
+      try {
+          const snapshot = await getDocs(collection(db, 'manga'));
+          const seenKeys = new Set();
+          let deleted = 0;
 
-            if (seenKeys.has(key)) {
-                const chs = await doc.ref.collection('chapters').get();
-                chs.forEach(c => c.ref.delete());
-                await doc.ref.delete();
-                deleted++;
-            } else {
-                if (key) seenKeys.add(key);
-            }
-        }
-        log(`✅ اكتمل التنظيف! تم حذف ${deleted} عمل مكرر.`);
-    }
+          for (const docItem of snapshot.docs) {
+              const data = docItem.data();
+              const cleanTitle = (data.title || '').replace(/[^a-zA-Z0-9أ-ي]/g, '').toLowerCase();
+              const key = data.source_url || cleanTitle;
+
+              if (seenKeys.has(key)) {
+                  const chs = await getDocs(collection(db, 'manga', docItem.id, 'chapters'));
+                  for (const c of chs.docs) {
+                      await deleteDoc(c.ref);
+                  }
+                  await deleteDoc(docItem.ref);
+                  deleted++;
+              } else {
+                  if (key) seenKeys.add(key);
+              }
+          }
+          log(`✅ اكتمل التنظيف! تم حذف ${deleted} عمل مكرر.`);
+      } catch (err) {
+          log(`❌ خطأ أثناء التنظيف: ${err.message}`);
+      }
+  }
+
+  // ربط الأزرار بالوظائف
+  document.getElementById('btnScrape').addEventListener('click', startScraper);
+  document.getElementById('btnClean').addEventListener('click', cleanDuplicates);
 </script>
 </body>
 </html>
