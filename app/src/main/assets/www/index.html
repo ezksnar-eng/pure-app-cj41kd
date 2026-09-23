@@ -6,14 +6,17 @@
     <title>تطبيق السحب والتنظيف - Pure Library</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { background-color: #121212; color: #fff; font-family: sans-serif; padding: 20px; }
+        body { background-color: #121212; color: #fff; font-family: system-ui, sans-serif; padding: 20px; }
         .container { max-width: 600px; margin: 0 auto; }
         h1 { text-align: center; margin-bottom: 20px; color: #00e676; font-size: 22px; }
         .card { background: #1e1e1e; padding: 15px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #333; }
-        input[type="text"] { width: 100%; padding: 12px; border-radius: 5px; border: 1px solid #444; background: #222; color: #fff; margin-bottom: 10px; font-size: 14px; }
-        button { width: 100%; padding: 12px; border: none; border-radius: 5px; font-weight: bold; cursor: pointer; margin-bottom: 8px; font-size: 14px; }
+        .source-info { background: #222; border: 1px solid #444; padding: 10px; border-radius: 5px; color: #29b6f6; font-size: 13px; margin-bottom: 12px; word-break: break-all; }
+        button { width: 100%; padding: 12px; border: none; border-radius: 5px; font-weight: bold; cursor: pointer; margin-bottom: 8px; font-size: 14px; transition: all 0.2s; }
         .btn-scrape { background: #29b6f6; color: #000; }
         .btn-clean { background: #ab47bc; color: #fff; }
+        .btn-wipe-req { background: #ff9800; color: #000; }
+        .btn-wipe-confirm { background: #d32f2f; color: #fff; display: none; animation: pulse 1s infinite alternate; }
+        @keyframes pulse { from { opacity: 0.8; } to { opacity: 1; transform: scale(1.01); } }
         #logBox { background: #000; border: 1px solid #222; padding: 10px; border-radius: 5px; height: 250px; overflow-y: auto; font-family: monospace; font-size: 12px; color: #00ff66; }
     </style>
 </head>
@@ -23,15 +26,22 @@
     <h1>🤖 تطبيق السحب والتنظيف (Pure Library)</h1>
 
     <div class="card">
-        <label style="display:block; margin-bottom: 8px;">رابط المانجا / الفصل:</label>
-        <input type="text" id="targetUrl" placeholder="ضع الرابط هنا...">
-        <button class="btn-scrape" id="btnScrape">🚀 بدء السحب عبر البروكسي</button>
-        <button class="btn-clean" id="btnClean">🧹 تنظيف المكررات من القاعدة</button>
+        <label style="display:block; margin-bottom: 6px; font-weight: bold;">الموقع المعتمد حالياً للسحب:</label>
+        <div class="source-info">🔗 https://azorafly.com/series/</div>
+        
+        <button class="btn-scrape" id="btnScrape">🚀 بدء السحب المباشر</button>
+        <button class="btn-clean" id="btnClean">🧹 تنظيف المكررات فقط</button>
+        
+        <hr style="border: 0.5px solid #333; margin: 12px 0;">
+        
+        <!-- نظام الحذف الشامل المزدوج -->
+        <button class="btn-wipe-req" id="btnWipeReq">⚠️ طلب تفريغ قاعدة البيانات بالكامل</button>
+        <button class="btn-wipe-confirm" id="btnWipeConfirm">🔥 تأكيد الحذف النهائي الشامل (حذف الكل)</button>
     </div>
 
     <div class="card">
         <label style="display:block; margin-bottom: 8px;">سجل العمليات المباشر:</label>
-        <div id="logBox">[SYSTEM] التطبيق جاهز ومستعد...</div>
+        <div id="logBox">[SYSTEM] النظام المطور جاهز ومستعد...</div>
     </div>
 </div>
 
@@ -55,6 +65,9 @@
   const db = getFirestore(app);
 
   const PROXY_URL = "http://127.0.0.1:8080";
+  
+  // 👉 الرابط الافتراضي التلقائي والكمثبت
+  const DEFAULT_TARGET_URL = "https://azorafly.com/series/";
 
   function log(msg) {
       const box = document.getElementById('logBox');
@@ -83,42 +96,25 @@
       return match ? `الفصل ${match[1]}` : text.trim();
   }
 
-  // دالة تنظيف الرابط تلقائياً فور النسخ واللصق
-  function autoFixUrl(raw) {
-      if (!raw) return '';
-      let clean = raw.trim();
-      // حذف أي سلاشات أو رموز غريبة من البداية أوتوماتيكياً
-      clean = clean.replace(/^[^a-zA-Z0-9]+/, '');
-      if (!clean.startsWith('http://') && !clean.startsWith('https://')) {
-          clean = 'https://' + clean;
-      }
-      return clean;
-  }
-
   async function startScraper() {
-      const rawInput = document.getElementById('targetUrl').value;
-      if (!rawInput.trim()) return alert('أدخل الرابط أولاً!');
+      const targetUrl = DEFAULT_TARGET_URL;
 
-      // تصحيح وتنظيف الرابط المنسوخ تلقائياً
-      const cleanUrl = autoFixUrl(rawInput);
-
-      log(`🚀 جاري جلب الصفحة (${cleanUrl})...`);
-      const html = await fetchViaProxy(cleanUrl);
+      log(`🚀 جاري جلب الصفحة الرئيسية (${targetUrl})...`);
+      const html = await fetchViaProxy(targetUrl);
       if (!html) return;
 
       const parser = new DOMParser();
       const docPage = parser.parseFromString(html, 'text/html');
 
       const titleEl = docPage.querySelector('h1.entry-title, h1.tit, div.post-title h1, h1');
-      if (!titleEl) return log('❌ لم يتم العثور على عنوان المانجا.');
-
-      const mangaTitle = titleEl.textContent.trim();
+      const mangaTitle = titleEl ? titleEl.textContent.trim() : "Azora_Series";
+      
       const docId = mangaTitle.replace(/[^a-zA-Z0-9_]/g, '_');
       const mangaRef = doc(db, 'manga', docId);
 
       await setDoc(mangaRef, {
           title: mangaTitle,
-          source_url: cleanUrl,
+          source_url: targetUrl,
           updated_at: serverTimestamp()
       }, { merge: true });
 
@@ -157,58 +153,86 @@
               }
           }
       }
-      log(`🎉 اكتمل سحب ${mangaTitle} بنجاح!`);
+      log(`🎉 اكتمل السحب بنجاح!`);
   }
 
   async function cleanDuplicates() {
       log('🧹 جاري فحص وتنظيف المكررات من الفايربيس...');
       try {
           const snapshot = await getDocs(collection(db, 'manga'));
-          
-          if (snapshot.empty) {
-              log('⚠️ لا توجد أي مانجا مخزنة في القاعدة حالياً.');
-              return;
-          }
+          if (snapshot.empty) return log('⚠️ لا توجد أي أعمال مخزنة حالياً.');
 
           const seenTitles = new Set();
           let deletedCount = 0;
 
           for (const docItem of snapshot.docs) {
               const data = docItem.data();
-              const cleanTitle = (data.title || docItem.id)
-                                  .toLowerCase()
-                                  .replace(/[^a-z0-9أ-ي]/g, '');
+              const cleanTitle = (data.title || docItem.id).toLowerCase().replace(/[^a-z0-9أ-ي]/g, '');
 
               if (seenTitles.has(cleanTitle)) {
-                  log(`🗑️ تم كشف مكرر: (${data.title || docItem.id}) .. جاري الحذف...`);
-                  
+                  log(`🗑️ حذف مكرر: (${data.title || docItem.id})...`);
                   const chs = await getDocs(collection(db, 'manga', docItem.id, 'chapters'));
-                  for (const c of chs.docs) {
-                      await deleteDoc(c.ref);
-                  }
-                  
+                  for (const c of chs.docs) await deleteDoc(c.ref);
                   await deleteDoc(docItem.ref);
                   deletedCount++;
               } else {
-                  if (cleanTitle) {
-                      seenTitles.add(cleanTitle);
-                  }
+                  if (cleanTitle) seenTitles.add(cleanTitle);
               }
           }
-
-          if (deletedCount > 0) {
-              log(`✅ اكتمل التنظيف بنجاح! تم حذف ${deletedCount} عمل مكرر.`);
-          } else {
-              log(`ℹ️ القاعدة نظيفة تماماً ولا يوجد بها أي أعمال مكررة حالياً.`);
-          }
-
+          log(`✅ اكتمل التنظيف! تم حذف ${deletedCount} عمل مكرر.`);
       } catch (err) {
           log(`❌ خطأ أثناء التنظيف: ${err.message}`);
       }
   }
 
+  async function wipeDatabase() {
+      log('🚨 بدء عملية التفريغ الشامل للقاعدة...');
+      try {
+          const snapshot = await getDocs(collection(db, 'manga'));
+          if (snapshot.empty) {
+              log('⚠️ القاعدة فارغة بالفعل!');
+              return;
+          }
+
+          let totalDeleted = 0;
+          for (const docItem of snapshot.docs) {
+              log(`🔥 مسح المانجا وفصولها: (${docItem.id})...`);
+              const chs = await getDocs(collection(db, 'manga', docItem.id, 'chapters'));
+              for (const c of chs.docs) {
+                  await deleteDoc(c.ref);
+              }
+              await deleteDoc(docItem.ref);
+              totalDeleted++;
+          }
+          log(`💥 تم تفريغ قاعدة البيانات بالكامل! تم حذف ${totalDeleted} عمل بجميع فصولها.`);
+      } catch (err) {
+          log(`❌ خطأ أثناء التفريغ الشامل: ${err.message}`);
+      }
+  }
+
   document.getElementById('btnScrape').addEventListener('click', startScraper);
   document.getElementById('btnClean').addEventListener('click', cleanDuplicates);
+
+  const btnReq = document.getElementById('btnWipeReq');
+  const btnConfirm = document.getElementById('btnWipeConfirm');
+  let wipeTimeout;
+
+  btnReq.addEventListener('click', () => {
+      btnConfirm.style.display = 'block';
+      log('⚠️ ظهر زر التأكيد الأحمر! اضغطه خلال 5 ثوانٍ لإكمال الحذف الشامل.');
+      
+      clearTimeout(wipeTimeout);
+      wipeTimeout = setTimeout(() => {
+          btnConfirm.style.display = 'none';
+          log('🔒 تم إلغاء طلب الحذف الشامل تلقائياً للأمان.');
+      }, 5000);
+  });
+
+  btnConfirm.addEventListener('click', () => {
+      btnConfirm.style.display = 'none';
+      clearTimeout(wipeTimeout);
+      wipeDatabase();
+  });
 </script>
 </body>
 </html>
