@@ -3,69 +3,36 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>تطبيق السحب الموزع الذكي - Pure Library</title>
+    <title>Pure Library - Scraper Engine</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { background-color: #121212; color: #fff; font-family: system-ui, sans-serif; padding: 20px; }
         .container { max-width: 650px; margin: 0 auto; }
-        h1 { text-align: center; margin-bottom: 20px; color: #00e676; font-size: 22px; }
+        h1 { text-align: center; margin-bottom: 20px; color: #00e676; font-size: 20px; }
         .card { background: #1e1e1e; padding: 15px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #333; }
-        .status-box { background: #222; border: 1px solid #444; padding: 10px; border-radius: 5px; color: #29b6f6; font-size: 13px; margin-bottom: 12px; }
-        button { width: 100%; padding: 12px; border: none; border-radius: 5px; font-weight: bold; cursor: pointer; margin-bottom: 8px; font-size: 14px; transition: all 0.2s; }
-        .btn-scrape { background: #00e676; color: #000; font-size: 16px; }
+        button { width: 100%; padding: 12px; border: none; border-radius: 5px; font-weight: bold; cursor: pointer; margin-bottom: 8px; font-size: 14px; }
+        .btn-scrape { background: #00e676; color: #000; }
         .btn-clean { background: #ab47bc; color: #fff; }
-        .btn-wipe-req { background: #ff9800; color: #000; }
-        .btn-wipe-confirm { background: #d32f2f; color: #fff; display: none; animation: pulse 1s infinite alternate; }
-        @keyframes pulse { from { opacity: 0.8; } to { opacity: 1; transform: scale(1.01); } }
         #logBox { background: #000; border: 1px solid #222; padding: 10px; border-radius: 5px; height: 320px; overflow-y: auto; font-family: monospace; font-size: 12px; color: #00ff66; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h1>🤖 نظام السحب الموزع والذكي (Pure Library)</h1>
+    <h1>🤖 محرك سحب وتنظيف Pure Library</h1>
 
     <div class="card">
-        <div class="status-box">
-            ⚙️ <b>نظام إدارة المهام:</b> يتم قفل العمل أثناء السحب لحمايته من التكرار، ولا ينتقل الكائن لعمل جديد حتى يكتمل العمل الحالي بالكامل.
-        </div>
-        
-        <button class="btn-scrape" id="btnScrape">🚀 تشغيل محرك السحب الموزع</button>
-        <button class="btn-clean" id="btnClean">🧹 تنظيف المكررات من القاعدة</button>
-        
-        <hr style="border: 0.5px solid #333; margin: 12px 0;">
-        
-        <button class="btn-wipe-req" id="btnWipeReq">⚠️ طلب تفريغ قاعدة البيانات بالكامل</button>
-        <button class="btn-wipe-confirm" id="btnWipeConfirm">🔥 تأكيد الحذف النهائي الشامل (حذف الكل)</button>
+        <button class="btn-scrape" id="btnScrape">🚀 بدء السحب الشامل (616 كائن عبر البروكسي)</button>
+        <button class="btn-clean" id="btnClean">🧹 بدء تنظيف المكررات بالكامل</button>
     </div>
 
     <div class="card">
-        <label style="display:block; margin-bottom: 8px;">سجل العمليات المباشر:</label>
-        <div id="logBox">[SYSTEM] النظام جاهز ومستعد لربط وإدارة المهام...</div>
+        <div id="logBox">[SYSTEM] جاهز لإرسال الأوامر للسيرفر...</div>
     </div>
 </div>
 
-<script type="module">
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-  import { 
-    getFirestore, collection, doc, setDoc, getDoc, getDocs, deleteDoc, serverTimestamp 
-  } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
-
-  const firebaseConfig = {
-    apiKey: "AIzaSyBkaDrsjial5W6xyXPPt1-trJhR7E9n2p4",
-    authDomain: "pure-library-2d45d.firebaseapp.com",
-    projectId: "pure-library-2d45d",
-    storageBucket: "pure-library-2d45d.firebasestorage.app",
-    messagingSenderId: "953898341477",
-    appId: "1:953898341477:web:85409f5597f894ff13e28c",
-    measurementId: "G-YS8VFDXVKZ"
-  };
-
-  const app = initializeApp(firebaseConfig);
-  const db = getFirestore(app);
-
+<script>
   const PROXY_URL = "http://127.0.0.1:8080";
-  const BASE_SERIES_URL = "https://azorafly.com/series/";
 
   function log(msg) {
       const box = document.getElementById('logBox');
@@ -73,225 +40,23 @@
       box.scrollTop = box.scrollHeight;
   }
 
-  async function fetchViaProxy(url) {
+  async function sendAction(actionType) {
       try {
-          const response = await fetch(PROXY_URL, {
+          log(`⏳ جاري إرسال أمر (${actionType}) إلى البروكسي...`);
+          const res = await fetch(PROXY_URL, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ url: url })
+              body: JSON.stringify({ action: actionType })
           });
-          const data = await response.json();
-          if (data.status === 'success') return data.html;
+          const data = await res.json();
+          log(`✅ استجابة السيرفر: ${data.message}`);
       } catch (err) {
-          log(`❌ خطأ الاتصال بالبروكسي: ${err.message}`);
-      }
-      return null;
-  }
-
-  function cleanChapterName(text) {
-      const match = text.match(/(?:الفصل|chapter)\s*(\d+(?:\.\d+)?)/i);
-      return match ? `الفصل ${match[1]}` : text.trim();
-  }
-
-  // --- دالة الكائن المسؤول عن سحب عمل واحد بالكامل ---
-  async function processSingleMangaTask(mangaItem) {
-      const docId = mangaItem.title.replace(/[^a-zA-Z0-9_]/g, '_');
-      const mangaRef = doc(db, 'manga', docId);
-
-      // 1. الفحص المسبق: هل العمل جاري سحبه أو مكتمل؟
-      const snapshot = await getDoc(mangaRef);
-      if (snapshot.exists()) {
-          const status = snapshot.data().status;
-          if (status === 'completed') {
-              log(`⏩ [تخطي] العمل مكتمل أصلًا: ${mangaItem.title}`);
-              return false;
-          }
-          if (status === 'in_progress') {
-              log(`🔒 [تخطي] يوجد كائن آخر يعمل حالياً على: ${mangaItem.title}`);
-              return false;
-          }
-      }
-
-      // 2. قفل العمل وتحديد حالته كـ in_progress
-      log(`🔒 [قفل العمل] تم استلام: (${mangaItem.title}) بواسطة الكائن.. جاري السحب...`);
-      await setDoc(mangaRef, {
-          title: mangaItem.title,
-          source_url: mangaItem.href,
-          status: 'in_progress',
-          updated_at: serverTimestamp()
-      }, { merge: true });
-
-      // 3. جلب صفحة المانجا وسحب جميع فصولها
-      const html = await fetchViaProxy(mangaItem.href);
-      if (!html) {
-          log(`❌ فشل جلب صفحة المانجا: ${mangaItem.title}`);
-          await setDoc(mangaRef, { status: 'failed' }, { merge: true });
-          return false;
-      }
-
-      const parser = new DOMParser();
-      const docPage = parser.parseFromString(html, 'text/html');
-
-      const links = Array.from(docPage.querySelectorAll('a'));
-      const chapters = [];
-
-      links.forEach(a => {
-          const href = a.getAttribute('href');
-          const text = a.textContent.trim();
-          if (href && (href.toLowerCase().includes('chapter') || text.includes('فصل') || text.toLowerCase().includes('chapter'))) {
-              chapters.push({ title: cleanChapterName(text), url: href });
-          }
-      });
-
-      log(`  📖 [${mangaItem.title}] عثر على ${chapters.length} فصل.. جاري تنزيل الصور...`);
-
-      // 4. سحب صور كل فصل
-      for (const ch of chapters) {
-          const chHtml = await fetchViaProxy(ch.url);
-          if (chHtml) {
-              const chDoc = parser.parseFromString(chHtml, 'text/html');
-              const imgs = Array.from(chDoc.querySelectorAll('div.reader-area img, div#readerarea img, img'));
-              const images = imgs.map(i => i.getAttribute('data-src') || i.getAttribute('src'))
-                                 .filter(i => i && !i.includes('logo') && !i.includes('avatar'));
-
-              if (images.length > 0) {
-                  const chDocId = ch.title.replace(/[^a-zA-Z0-9]/g, '_');
-                  const chRef = doc(db, 'manga', docId, 'chapters', chDocId);
-                  
-                  await setDoc(chRef, {
-                      title: ch.title,
-                      images: images,
-                      url: ch.url,
-                      updated_at: serverTimestamp()
-                  }, { merge: true });
-              }
-          }
-      }
-
-      // 5. إنهاء العمل وتحديث حالته إلى completed
-      await setDoc(mangaRef, {
-          status: 'completed',
-          chapters_count: chapters.length,
-          updated_at: serverTimestamp()
-      }, { merge: true });
-
-      log(`✅ [إكمال] تم الانتهاء من العمل بالكامل: ${mangaItem.title}! ينقل الكائن للعمل التالي..`);
-      return true;
-  }
-
-  // --- محرك إدارة جلب قائمة الأعمال والتمرير على الصفحات ---
-  async function startTaskDistributedScraper() {
-      log('🚀 تشغيل نظام السحب الموزع الذكي...');
-      let page = 1;
-      let hasNextPage = true;
-
-      while (hasNextPage) {
-          const pageUrl = page === 1 ? BASE_SERIES_URL : `${BASE_SERIES_URL}page/${page}/`;
-          log(`🌐 فحص قائمة الأعمال - الصفحة (${page})...`);
-          
-          const html = await fetchViaProxy(pageUrl);
-          if (!html) {
-              log(`⚠️ تعذر الوصول للصفحة ${page}، يتوقف الفحص.`);
-              break;
-          }
-
-          const parser = new DOMParser();
-          const docPage = parser.parseFromString(html, 'text/html');
-
-          const mangaLinks = Array.from(docPage.querySelectorAll('div.bsx a, div.listupd a, article a'))
-                                  .map(a => ({ href: a.getAttribute('href'), title: a.getAttribute('title') || a.textContent.trim() }))
-                                  .filter(item => item.href && item.href.includes('/series/'));
-
-          const uniqueManga = Array.from(new Map(mangaLinks.map(item => [item.href, item])).values());
-
-          if (uniqueManga.length === 0) {
-              log(`🏁 انتهت القائمة عند الصفحة ${page}.`);
-              hasNextPage = false;
-              break;
-          }
-
-          // معالجة كل عمل عبر كائن المهمة
-          for (const item of uniqueManga) {
-              await processSingleMangaTask(item);
-          }
-
-          page++;
-      }
-
-      log(`🎉 اكتملت كافة المهام بنجاح!`);
-  }
-
-  async function cleanDuplicates() {
-      log('🧹 جاري فحص وتنظيف المكررات من الفايربيس...');
-      try {
-          const snapshot = await getDocs(collection(db, 'manga'));
-          if (snapshot.empty) return log('⚠️ لا توجد أي أعمال مخزنة حالياً.');
-
-          const seenTitles = new Set();
-          let deletedCount = 0;
-
-          for (const docItem of snapshot.docs) {
-              const data = docItem.data();
-              const cleanTitle = (data.title || docItem.id).toLowerCase().replace(/[^a-z0-9أ-ي]/g, '');
-
-              if (seenTitles.has(cleanTitle)) {
-                  log(`🗑️ حذف مكرر: (${data.title || docItem.id})...`);
-                  const chs = await getDocs(collection(db, 'manga', docItem.id, 'chapters'));
-                  for (const c of chs.docs) await deleteDoc(c.ref);
-                  await deleteDoc(docItem.ref);
-                  deletedCount++;
-              } else {
-                  if (cleanTitle) seenTitles.add(cleanTitle);
-              }
-          }
-          log(`✅ اكتمل التنظيف! تم حذف ${deletedCount} عمل مكرر.`);
-      } catch (err) {
-          log(`❌ خطأ أثناء التنظيف: ${err.message}`);
+          log(`❌ فشل الاتصال بالبروكسي: ${err.message}`);
       }
   }
 
-  async function wipeDatabase() {
-      log('🚨 بدء عملية التفريغ الشامل للقاعدة...');
-      try {
-          const snapshot = await getDocs(collection(db, 'manga'));
-          if (snapshot.empty) return log('⚠️ القاعدة فارغة بالفعل!');
-
-          let totalDeleted = 0;
-          for (const docItem of snapshot.docs) {
-              log(`🔥 مسح المانجا وفصولها: (${docItem.id})...`);
-              const chs = await getDocs(collection(db, 'manga', docItem.id, 'chapters'));
-              for (const c of chs.docs) await deleteDoc(c.ref);
-              await deleteDoc(docItem.ref);
-              totalDeleted++;
-          }
-          log(`💥 تم تفريغ القاعدة بالكامل! تم حذف ${totalDeleted} عمل.`);
-      } catch (err) {
-          log(`❌ خطأ أثناء التفريغ الشامل: ${err.message}`);
-      }
-  }
-
-  document.getElementById('btnScrape').addEventListener('click', startTaskDistributedScraper);
-  document.getElementById('btnClean').addEventListener('click', cleanDuplicates);
-
-  const btnReq = document.getElementById('btnWipeReq');
-  const btnConfirm = document.getElementById('btnWipeConfirm');
-  let wipeTimeout;
-
-  btnReq.addEventListener('click', () => {
-      btnConfirm.style.display = 'block';
-      log('⚠️ اضغط الزر الأحمر خلال 5 ثوانٍ لإكمال الحذف الشامل.');
-      clearTimeout(wipeTimeout);
-      wipeTimeout = setTimeout(() => {
-          btnConfirm.style.display = 'none';
-          log('🔒 تم إلغاء طلب الحذف الشامل تلقائياً.');
-      }, 5000);
-  });
-
-  btnConfirm.addEventListener('click', () => {
-      btnConfirm.style.display = 'none';
-      clearTimeout(wipeTimeout);
-      wipeDatabase();
-  });
+  document.getElementById('btnScrape').addEventListener('click', () => sendAction('start_scraper'));
+  document.getElementById('btnClean').addEventListener('click', () => sendAction('clean_duplicates'));
 </script>
 </body>
 </html>
