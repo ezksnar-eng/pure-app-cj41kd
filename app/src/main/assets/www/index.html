@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>تطبيق سحب المانهوا</title>
+<style>
+  :root{
+    --bg:#0f1115; --panel:#171a21; --border:#2a2f3a; --text:#e6e8ec;
+    --muted:#8a8f9a; --accent:#4f8cff; --ok:#3ecf8e; --err:#ff5d5d;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; background:var(--bg); color:var(--text);
+    font-family:system-ui,-apple-system,"Segoe UI",sans-serif;
+    padding:20px;
+  }
+  h1{font-size:18px; margin:0 0 4px}
+  p.sub{color:var(--muted); margin:0 0 20px; font-size:13px}
+  .panel{
+    background:var(--panel); border:1px solid var(--border);
+    border-radius:10px; padding:16px; margin-bottom:14px;
+  }
+  label{display:block; font-size:12px; color:var(--muted); margin-bottom:4px}
+  input{
+    width:100%; padding:8px 10px; border-radius:6px; border:1px solid var(--border);
+    background:#0d0f14; color:var(--text); font-size:13px; margin-bottom:10px;
+  }
+  .row{display:flex; gap:10px; flex-wrap:wrap}
+  .row > div{flex:1; min-width:160px}
+  button{
+    background:var(--accent); color:#fff; border:none; padding:9px 16px;
+    border-radius:6px; font-size:13px; cursor:pointer;
+  }
+  button:disabled{opacity:.5; cursor:not-allowed}
+  button.secondary{background:#2a2f3a}
+  .stats{display:flex; gap:14px; flex-wrap:wrap; margin:12px 0}
+  .stat{background:#0d0f14; border:1px solid var(--border); border-radius:8px; padding:10px 14px; min-width:110px}
+  .stat b{display:block; font-size:20px}
+  .stat span{color:var(--muted); font-size:11px}
+  #log{
+    height:260px; overflow-y:auto; background:#0d0f14; border:1px solid var(--border);
+    border-radius:8px; padding:10px; font-size:12px; font-family:monospace; line-height:1.6;
+  }
+  .ok{color:var(--ok)} .err{color:var(--err)} .muted{color:var(--muted)}
+</style>
+</head>
+<body>
+
+<h1>تطبيق سحب المانهوا — 616 كائن</h1>
+<p class="sub">يسحب كل مانهوا من أرشيف ازورا عبر البروكسي، ويرفعها لـ Firestore بدون تكرار.</p>
+
+<div class="panel">
+  <div class="row">
+    <div>
+      <label>رابط البروكسي (proxy.py)</label>
+      <input id="proxyUrl" value="http://127.0.0.1:8000/fetch">
+    </div>
+    <div>
+      <label>رابط أرشيف السلاسل</label>
+      <input id="seriesUrl" value="https://azorafly.com/series/">
+    </div>
+  </div>
+  <div class="row">
+    <div>
+      <label>Firebase Web API Key (من Project Settings — ليس الملف الخاص)</label>
+      <input id="apiKey" placeholder="AIzaSy...">
+    </div>
+    <div>
+      <label>Project ID</label>
+      <input id="projectId" value="pure-library-2d45d">
+    </div>
+  </div>
+  <div class="row">
+    <div>
+      <label>عدد الكائنات (Workers)</label>
+      <input id="workerCount" value="616" type="number">
+    </div>
+    <div>
+      <label>أقصى صفحات أرشيف</label>
+      <input id="maxPages" value="50" type="number">
+    </div>
+  </div>
+  <button id="startBtn" onclick="startRun()">🚀 ابدأ السحب</button>
+  <button class="secondary" onclick="purgeDuplicates()">🧹 حذف التكرار</button>
+  <button class="secondary" onclick="stopRun()">⛔ إيقاف</button>
+</div>
+
+<div class="stats">
+  <div class="stat"><b id="stSeries">0</b><span>مانهوا مسحوبة</span></div>
+  <div class="stat"><b id="stChapters">0</b><span>فصل</span></div>
+  <div class="stat"><b id="stSkipped">0</b><span>متجاوزة (موجودة)</span></div>
+  <div class="stat"><b id="stFailed">0</b><span>فشل</span></div>
+  <div class="stat"><b id="stActive">0</b><span>كائن نشط الآن</span></div>
+</div>
+
+<div class="panel">
+  <div id="log"></div>
+</div>
+
+<script>
+// ============================================================
+// إعدادات وحالة عامة
+// ============================================================
+let RUNNING = false;
+let idToken = null;
+
+const inProgress = new Set();      // قفل: مانهوا قيد المعالجة حالياً
+const queue = [];                  // روابط السلاسل بالانتظار
+const stats = { series: 0, chapters: 0, skipped: 0, failed: 0, active: 0 };
+
+// selectors تخص تصميم الموقع — عدّلها إذا اختلف شكل صفحات azorafly.com
+const SEL = {
+  listingCard: 'div.page-item-detail',
+  listingLink: 'h3.h5 a, .post-title a',
+  nextPage: 'a.next.page-numbers, .nav-previous a',
+  title: 'h1.entry-title, div.post-title h1',
+  score: '.score, .rating .score, span.total_votes',
+  cover: 'div.summary_image img, div.thumb img',
+  genres: '.genres-content a, .summary-content .genres a',
+  chapterRow: 'li.wp-manga-chapter a, ul.main.version-chap li a',
+  pageImage: 'div.reader-area img, div#readerarea img, div.page-break img',
+};
+
+function log(msg, cls) {
+  const el = document.getElementById('log');
+  const line = document.createElement('div');
+  if (cls) line.className = cls;
+  const t = new Date().toLocaleTimeString('ar-IQ');
+  line.textContent = `[${t}] ${msg}`;
+  el.appendChild(line);
+  el.scrollTop = el.scrollHeight;
+}
+
+function renderStats() {
+  document.getElementById('stSeries').textContent = stats.series;
+  document.getElementById('stChapters').textContent = stats.chapters;
+  document.getElementById('stSkipped').textContent = stats.skipped;
+  document.getElementById('stFailed').textContent = stats.failed;
+  document.getElementById('stActive').textContent = stats.active;
+}
+
+function safeDocId(text) {
+  if (!text) return 'manga_doc';
+  let s = text.normalize('NFKC').trim().toLowerCase();
+  s = s.replace(/[^\w\u0600-\u06FF]+/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '');
+  return (s || 'manga_doc').slice(0, 150);
+}
+
+function normalizeUrl(u) {
+  if (!u) return '';
+  u = u.trim().toLowerCase().split('#')[0];
+  return u.endsWith('/') ? u.slice(0, -1) : u;
+}
+
+// ============================================================
+// جلب صفحات عبر البروكسي
+// ============================================================
+async function fetchViaProxy(targetUrl, retries = 3) {
+  const proxyBase = document.getElementById('proxyUrl').value.trim();
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      const res = await fetch(`${proxyBase}?url=${encodeURIComponent(targetUrl)}`);
+      if (res.ok) return await res.text();
+    } catch (e) {
+      // تجاهل ونعيد المحاولة
+    }
+    await new Promise(r => setTimeout(r, 1500 * attempt));
+  }
+  return null;
+}
+
+function parseHTML(html) {
+  return new DOMParser().parseFromString(html, 'text/html');
+}
+
+// ============================================================
+// Firebase Auth (مجهول) + Firestore REST
+// ============================================================
+async function ensureAuth() {
+  if (idToken) return idToken;
+  const apiKey = document.getElementById('apiKey').value.trim();
+  const res = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${apiKey}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ returnSecureToken: true }),
+  });
+  if (!res.ok) throw new Error('فشل تسجيل الدخول المجهول — تأكد من تفعيل Anonymous Auth و apiKey صحيح');
+  const data = await res.json();
+  idToken = data.idToken;
+  return idToken;
+}
+
+function toFirestoreValue(v) {
+  if (v === null || v === undefined) return { nullValue: null };
+  if (typeof v === 'number') return Number.isInteger(v) ? { integerValue: String(v) } : { doubleValue: v };
+  if (typeof v === 'boolean') return { booleanValue: v };
+  if (Array.isArray(v)) return { arrayValue: { values: v.map(toFirestoreValue) } };
+  return { stringValue: String(v) };
+}
+
+function toFirestoreFields(obj) {
+  const fields = {};
+  for (const [k, val] of Object.entries(obj)) fields[k] = toFirestoreValue(val);
+  return { fields };
+}
+
+async function firestoreWrite(path, obj) {
+  const projectId = document.getElementById('projectId').value.trim();
+  const token = await ensureAuth();
+  const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/${path}?updateMask.fieldPaths=` +
+              Object.keys(obj).map(encodeURIComponent).join('&updateMask.fieldPaths=');
+  const res = await fetch(url, {
+    method: 'PATCH',
+    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(toFirestoreFields(obj)),
+  });
+  if (!res.ok) throw new Error(`Firestore write failed (${res.status}): ${await res.text()}`);
+  return res.json();
+}
+
+async function firestoreGet(path) {
+  const projectId = document.getElementById('projectId').value.trim();
+  const token = await ensureAuth();
+  const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/${path}`;
+  const res = await fetch(url, { headers: { 'Authorization': `Bearer ${token}` } });
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(`Firestore get failed (${res.status})`);
+  return res.json();
+}
+
+async function firestoreListCollection(name) {
+  const projectId = document.getElementById('projectId').value.trim();
+  const token = await ensureAuth();
+  let docs = [];
+  let pageToken = null;
+  do {
+    const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/${name}` +
+                `?pageSize=300${pageToken ? '&pageToken=' + pageToken : ''}`;
+    const res = await fetch(url, { headers: { 'Authorization': `Bearer ${token}` } });
+    if (!res.ok) throw new Error(`Firestore list failed (${res.status})`);
+    const data = await res.json();
+    docs = docs.concat(data.documents || []);
+    pageToken = data.nextPageToken || null;
+  } while (pageToken);
+  return docs;
+}
+
+async function firestoreDelete(path) {
+  const projectId = document.getElementById('projectId').value.trim();
+  const token = await ensureAuth();
+  const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/${path}`;
+  await fetch(url, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
+}
+
+function fieldsToObj(doc) {
+  const out = {};
+  const fields = (doc && doc.fields) || {};
+  for (const [k, v] of Object.entries(fields)) {
+    if ('stringValue' in v) out[k] = v.stringValue;
+    else if ('integerValue' in v) out[k] = parseInt(v.integerValue, 10);
+    else if ('doubleValue' in v) out[k] = v.doubleValue;
+    else if ('booleanValue' in v) out[k] = v.booleanValue;
+    else if ('arrayValue' in v) out[k] = (v.arrayValue.values || []).map(x => x.stringValue ?? x.integerValue ?? '');
+  }
+  return out;
+}
+
+// ============================================================
+// اكتشاف روابط السلاسل عبر الصفحات (pagination)
+// ============================================================
+async function discoverSeriesLinks() {
+  const startUrl = document.getElementById('seriesUrl').value.trim();
+  const maxPages = parseInt(document.getElementById('maxPages').value, 10) || 50;
+  const links = new Set();
+  let url = startUrl;
+  const seenPages = new Set();
+
+  for (let i = 0; i < maxPages && RUNNING; i++) {
+    if (!url || seenPages.has(url)) break;
+    seenPages.add(url);
+
+    const html = await fetchViaProxy(url);
+    if (!html) { log(`فشل جلب صفحة الأرشيف: ${url}`, 'err'); break; }
+
+    const doc = parseHTML(html);
+    doc.querySelectorAll(SEL.listingCard).forEach(card => {
+      const a = card.querySelector(SEL.listingLink);
+      if (a && a.href) links.add(a.href);
+    });
+
+    log(`صفحة ${i + 1}: وجدت ${links.size} رابط تراكمي`);
+    const nextEl = doc.querySelector(SEL.nextPage);
+    url = nextEl ? nextEl.href : null;
+  }
+  return [...links];
+}
+
+// ============================================================
+// سحب مانهوا وحدة + كل فصولها وصفحاتها
+// ============================================================
+async function scrapeSeries(url) {
+  const html = await fetchViaProxy(url);
+  if (!html) return null;
+
+  const doc = parseHTML(html);
+  const titleEl = doc.querySelector(SEL.title);
+  if (!titleEl) return null;
+
+  const title = titleEl.textContent.trim();
+  const scoreEl = doc.querySelector(SEL.score);
+  const coverEl = doc.querySelector(SEL.cover);
+  const genreEls = [...doc.querySelectorAll(SEL.genres)];
+  const chapterRows = [...doc.querySelectorAll(SEL.chapterRow)];
+
+  const series = {
+    title,
+    slug: safeDocId(title),
+    source_url: url,
+    source_url_normalized: normalizeUrl(url),
+    score: scoreEl ? scoreEl.textContent.trim() : '',
+    cover_url: coverEl ? (coverEl.getAttribute('data-src') || coverEl.src || '') : '',
+    genres: genreEls.map(g => g.textContent.trim()),
+    chapters: [],
+  };
+
+  for (const row of chapterRows) {
+    const chTitle = row.textContent.trim() || 'Untitled';
+    const chUrl = row.href;
+    if (!chUrl) continue;
+    const pages = await scrapeChapterPages(chUrl);
+    series.chapters.push({ title: chTitle, url: chUrl, pages });
+  }
+
+  return series;
+}
+
+async function scrapeChapterPages(chapterUrl) {
+  const html = await fetchViaProxy(chapterUrl);
+  if (!html) return [];
+  const doc = parseHTML(html);
+  const pages = [];
+  doc.querySelectorAll(SEL.pageImage).forEach(img => {
+    const src = img.getAttribute('data-src') || img.getAttribute('src');
+    if (src && src.trim()) pages.push(src.trim());
+  });
+  return pages;
+}
+
+// ============================================================
+// رفع لـ Firestore بدون تكرار
+// ============================================================
+async function upsertSeries(series) {
+  const existing = await firestoreGet(`manga/${series.slug}`);
+  if (existing) {
+    const prev = fieldsToObj(existing);
+    if (prev.chapter_count === series.chapters.length) {
+      stats.skipped++;
+      log(`⏭️ تجاوز: ${series.title} (موجودة ومحدّثة)`, 'muted');
+      return;
+    }
+  }
+
+  await firestoreWrite(`manga/${series.slug}`, {
+    title: series.title,
+    title_normalized: series.title.normalize('NFKC').trim().toLowerCase(),
+    source_url: series.source_url,
+    source_url_normalized: series.source_url_normalized,
+    score: series.score,
+    cover_url: series.cover_url,
+    genres: series.genres,
+    chapter_count: series.chapters.length,
+  });
+
+  for (const ch of series.chapters) {
+    const chId = safeDocId(ch.title) || safeDocId(ch.url);
+    await firestoreWrite(`manga/${series.slug}/chapters/${chId}`, {
+      title: ch.title,
+      url: ch.url,
+      pages: ch.pages,
+      page_count: ch.pages.length,
+    });
+  }
+
+  stats.series++;
+  stats.chapters += series.chapters.length;
+  log(`✅ ${series.title} — ${series.chapters.length} فصل`, 'ok');
+}
+
+// ============================================================
+// نظام الكائنات (Workers) + القفل
+// ============================================================
+async function claim(url) {
+  if (inProgress.has(url)) return false;
+  inProgress.add(url);
+  return true;
+}
+function release(url) { inProgress.delete(url); }
+
+async function workerLoop(id) {
+  while (RUNNING) {
+    const url = queue.shift();
+    if (!url) { await new Promise(r => setTimeout(r, 300)); if (!queue.length) break; continue; }
+
+    if (!(await claim(url))) continue; // كائن ثاني ياخذها، تجاوز
+
+    stats.active++;
+    renderStats();
+    try {
+      const series = await scrapeSeries(url);
+      if (series) {
+        await upsertSeries(series);
+      } else {
+        stats.failed++;
+        log(`❌ تعذر تحليل: ${url}`, 'err');
+      }
+    } catch (e) {
+      stats.failed++;
+      log(`❌ خطأ بكائن ${id}: ${e.message}`, 'err');
+    } finally {
+      release(url);
+      stats.active--;
+      renderStats();
+    }
+  }
+  stats.active = Math.max(0, stats.active); // احتياط
+}
+
+async function startRun() {
+  if (RUNNING) return;
+  RUNNING = true;
+  document.getElementById('startBtn').disabled = true;
+  log('🚀 بدء الاكتشاف...');
+
+  const links = await discoverSeriesLinks();
+  log(`📚 مجموع الروابط المكتشفة: ${links.length}`);
+  queue.push(...links);
+
+  const workerCount = Math.min(parseInt(document.getElementById('workerCount').value, 10) || 616, Math.max(1, links.length));
+  log(`👷 تشغيل ${workerCount} كائن...`);
+
+  const workers = [];
+  for (let i = 0; i < workerCount; i++) workers.push(workerLoop(i));
+  await Promise.all(workers);
+
+  log('🎉 انتهت جولة السحب.', 'ok');
+  document.getElementById('startBtn').disabled = false;
+  RUNNING = false;
+}
+
+function stopRun() {
+  RUNNING = false;
+  log('⛔ تم إيقاف التشغيل (الكائنات الحالية تكمل شغلها الحالي بس ما تاخذ جديد).', 'muted');
+  document.getElementById('startBtn').disabled = false;
+}
+
+// ============================================================
+// حذف التكرار (Duplicate Purger)
+// ============================================================
+async function purgeDuplicates() {
+  log('🔍 فحص التكرار...');
+  const docs = await firestoreListCollection('manga');
+  const parsed = docs.map(d => ({
+    id: d.name.split('/').pop(),
+    ref: d.name,
+    data: fieldsToObj(d),
+  }));
+
+  const groups = new Map(); // key -> [docs]
+  for (const doc of parsed) {
+    const key = doc.data.title_normalized || doc.data.source_url_normalized;
+    if (!key) continue;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(doc);
+  }
+
+  let removed = 0, keptGroups = 0;
+  for (const [, group] of groups) {
+    if (group.length < 2) continue;
+    keptGroups++;
+    group.sort((a, b) => (b.data.chapter_count || 0) - (a.data.chapter_count || 0));
+    const keep = group[0];
+    for (const dupe of group.slice(1)) {
+      // حذف sub-collection الفصول أولاً
+      const chapters = await firestoreListCollection(`manga/${dupe.id}/chapters`).catch(() => []);
+      for (const ch of chapters) await firestoreDelete(ch.name.replace(/^.*\/documents\//, ''));
+      await firestoreDelete(`manga/${dupe.id}`);
+      removed++;
+      log(`🗑️ حذف نسخة مكررة: ${dupe.data.title || dupe.id}`, 'err');
+    }
+    log(`✅ أبقيت: ${keep.data.title || keep.id}`, 'ok');
+  }
+
+  log(`🎉 التنظيف خلص — مجاميع مكررة: ${keptGroups} | محذوف: ${removed}`, 'ok');
+}
+</script>
+</body>
+</html>

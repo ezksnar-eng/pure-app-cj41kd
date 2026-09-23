@@ -1,195 +1,154 @@
 package com.pure.appcj41kd;
 
+import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.content.Intent;
 import android.graphics.Color;
-import android.graphics.Typeface;
-import android.os.Build;
+import android.net.Uri;
 import android.os.Bundle;
-import android.view.Gravity;
-import android.view.KeyEvent;
 import android.view.View;
-import android.view.inputmethod.EditorInfo;
+import android.webkit.CookieManager;
+import android.webkit.DownloadListener;
+import android.webkit.ValueCallback;
+import android.webkit.WebChromeClient;
+import android.webkit.WebResourceRequest;
+import android.webkit.WebResourceResponse;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
-import android.widget.Button;
-import android.widget.EditText;
-import android.widget.FrameLayout;
-import android.widget.LinearLayout;
-import android.widget.ScrollView;
-import android.widget.TextView;
+import android.widget.Toast;
 
-import java.net.InetSocketAddress;
-import java.net.Socket;
+import androidx.webkit.WebViewAssetLoader;
 
-public class MainActivity extends Activity implements Host.Listener {
+import java.io.File;
 
+public class MainActivity extends Activity {
+
+    private static final String START_URL = "https://appassets.androidplatform.net/assets/www/index.html";
+    private static final boolean BUNDLED = true;
+    private static final boolean FULLSCREEN = true;
+    private static final boolean ALLOW_ZOOM = false;
+    private static final boolean LIGHT_STATUS = false;
     private static final String STATUS_COLOR = "#c81466";
-    private static final int WEB_PORT = 0;
-    private static final boolean BG = false;
+    private static final String LIVE_BASE = "https://raw.githubusercontent.com/ezksnar-eng/pure-app-cj41kd/main/live/";
+    private static final long BUNDLED_VERSION = 1790201755L;
+    private static final String ENTRY = "index.html";
+    private static final String ASSET_HOST = "appassets.androidplatform.net";
+    private static final int FILE_REQ = 4242;
 
-    private FrameLayout frame;
-    private LinearLayout consoleView;
-    private ScrollView scroll;
-    private TextView output;
-    private EditText input;
     private WebView webView;
-    private Button toggle;
-    private boolean showingWeb = false;
+    private ValueCallback<Uri[]> fileCallback;
+    private WebViewAssetLoader assetLoader;
+    private File liveDir;
 
+    @SuppressLint("SetJavaScriptEnabled")
+    @SuppressWarnings("deprecation")
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        try {
-            getWindow().setStatusBarColor(Color.parseColor(STATUS_COLOR));
-        } catch (Exception ignored) {
-        }
-        buildUi();
-        if (BG) {
-            if (Build.VERSION.SDK_INT >= 33) {
-                requestPermissions(new String[]{"android.permission.POST_NOTIFICATIONS"}, 7);
-            }
-            Intent svc = new Intent(this, HostService.class);
-            if (Build.VERSION.SDK_INT >= 26) {
-                startForegroundService(svc);
-            } else {
-                startService(svc);
-            }
-        }
-        Host.start(this);
-        Host.attach(this);
-        if (WEB_PORT > 0) {
-            watchPort();
-        }
-    }
 
-    private int dp(int v) {
-        return (int) (v * getResources().getDisplayMetrics().density + 0.5f);
-    }
+        liveDir = new File(getFilesDir(), "live");
+        liveDir.mkdirs();
+        assetLoader = new WebViewAssetLoader.Builder()
+                .addPathHandler("/assets/", new WebViewAssetLoader.AssetsPathHandler(this))
+                .addPathHandler("/live/", new WebViewAssetLoader.InternalStoragePathHandler(this, liveDir))
+                .build();
 
-    private void buildUi() {
-        frame = new FrameLayout(this);
-        frame.setBackgroundColor(0xFF1A0510);
+        webView = new WebView(this);
+        setContentView(webView);
+        applyWindow();
 
-        consoleView = new LinearLayout(this);
-        consoleView.setOrientation(LinearLayout.VERTICAL);
+        WebSettings s = webView.getSettings();
+        s.setJavaScriptEnabled(true);
+        s.setDomStorageEnabled(true);
+        s.setDatabaseEnabled(true);
+        s.setMediaPlaybackRequiresUserGesture(false);
+        s.setAllowFileAccess(false);
+        s.setAllowContentAccess(true);
+        s.setUseWideViewPort(true);
+        s.setLoadWithOverviewMode(true);
+        s.setSupportZoom(ALLOW_ZOOM);
+        s.setBuiltInZoomControls(ALLOW_ZOOM);
+        s.setDisplayZoomControls(false);
+        s.setMixedContentMode(WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE);
 
-        scroll = new ScrollView(this);
-        output = new TextView(this);
-        output.setTextColor(0xFFFFD6EA);
-        output.setTypeface(Typeface.MONOSPACE);
-        output.setTextSize(13f);
-        output.setPadding(dp(12), dp(12), dp(12), dp(12));
-        output.setTextIsSelectable(true);
-        scroll.addView(output, new ScrollView.LayoutParams(ScrollView.LayoutParams.MATCH_PARENT, ScrollView.LayoutParams.WRAP_CONTENT));
-        consoleView.addView(scroll, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f));
+        CookieManager cookies = CookieManager.getInstance();
+        cookies.setAcceptCookie(true);
+        cookies.setAcceptThirdPartyCookies(webView, true);
 
-        LinearLayout bar = new LinearLayout(this);
-        bar.setOrientation(LinearLayout.HORIZONTAL);
-        bar.setGravity(Gravity.CENTER_VERTICAL);
-        bar.setBackgroundColor(0xFF2A0A1C);
-        bar.setPadding(dp(8), dp(6), dp(8), dp(6));
-
-        input = new EditText(this);
-        input.setSingleLine(true);
-        input.setTextColor(Color.WHITE);
-        input.setHintTextColor(0xFF9D6B86);
-        input.setHint(">");
-        input.setImeOptions(EditorInfo.IME_ACTION_SEND);
-        input.setOnEditorActionListener(new TextView.OnEditorActionListener() {
+        webView.setWebViewClient(new WebViewClient() {
             @Override
-            public boolean onEditorAction(TextView v, int actionId, KeyEvent event) {
-                submit();
+            public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
+                return assetLoader.shouldInterceptRequest(request.getUrl());
+            }
+
+            @Override
+            public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
+                return handleUrl(request.getUrl());
+            }
+        });
+
+        webView.setWebChromeClient(new WebChromeClient() {
+            @Override
+            public boolean onShowFileChooser(WebView view, ValueCallback<Uri[]> callback, FileChooserParams params) {
+                if (fileCallback != null) {
+                    fileCallback.onReceiveValue(null);
+                }
+                fileCallback = callback;
+                try {
+                    startActivityForResult(params.createIntent(), FILE_REQ);
+                } catch (Exception e) {
+                    fileCallback = null;
+                    return false;
+                }
                 return true;
             }
         });
-        bar.addView(input, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
 
-        Button send = new Button(this);
-        send.setText("\u0625\u0631\u0633\u0627\u0644");
-        send.setOnClickListener(new View.OnClickListener() {
+        webView.setDownloadListener(new DownloadListener() {
             @Override
-            public void onClick(View v) {
-                submit();
+            public void onDownloadStart(String url, String userAgent, String contentDisposition, String mimetype, long contentLength) {
+                openExternal(Uri.parse(url));
             }
         });
-        bar.addView(send, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
 
-        if (BG) {
-            Button stop = new Button(this);
-            stop.setText("\u0625\u064a\u0642\u0627\u0641");
-            stop.setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View v) {
-                    stopService(new Intent(MainActivity.this, HostService.class));
-                    finishAffinity();
-                    android.os.Process.killProcess(android.os.Process.myPid());
-                }
-            });
-            bar.addView(stop, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+        boolean restored = savedInstanceState != null && webView.restoreState(savedInstanceState) != null;
+        if (!restored) {
+            webView.loadUrl(startUrl());
         }
+        startLiveCheck();
+    }
 
-        consoleView.addView(bar, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
-        frame.addView(consoleView, new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
-
-        toggle = new Button(this);
-        toggle.setText("\u0627\u0644\u0633\u062c\u0644");
-        toggle.setVisibility(View.GONE);
-        toggle.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                toggleView();
+    private String startUrl() {
+        if (BUNDLED && LIVE_BASE.length() > 0) {
+            File content = new File(liveDir, "content");
+            if (content.exists() && LiveUpdater.readVersion(liveDir) > BUNDLED_VERSION) {
+                String e = LiveUpdater.readEntry(liveDir, ENTRY);
+                return "https://" + ASSET_HOST + "/live/content/" + Uri.encode(e, "/");
             }
-        });
-        frame.addView(toggle, new FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT, Gravity.TOP | Gravity.END));
-
-        setContentView(frame);
+        }
+        return START_URL;
     }
 
-    private void submit() {
-        String t = input.getText().toString();
-        input.setText("");
-        output.append(t + "\n");
-        Host.submit(t);
-    }
-
-    @Override
-    public void onAppend(final String text) {
-        runOnUiThread(new Runnable() {
-            @Override
-            public void run() {
-                output.append(text);
-                scroll.post(new Runnable() {
-                    @Override
-                    public void run() {
-                        scroll.fullScroll(View.FOCUS_DOWN);
-                    }
-                });
-            }
-        });
-    }
-
-    private void watchPort() {
+    private void startLiveCheck() {
+        if (!BUNDLED || LIVE_BASE.length() == 0) {
+            return;
+        }
         Thread t = new Thread(new Runnable() {
             @Override
             public void run() {
-                long t0 = System.currentTimeMillis();
-                while (System.currentTimeMillis() - t0 < 180000L) {
-                    if (portOpen(WEB_PORT)) {
-                        runOnUiThread(new Runnable() {
-                            @Override
-                            public void run() {
-                                showWeb();
+                long have = Math.max(BUNDLED_VERSION, LiveUpdater.readVersion(liveDir));
+                boolean updated = LiveUpdater.update(LIVE_BASE, new File(liveDir, "content"), liveDir, have, true);
+                if (updated) {
+                    runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() {
+                            if (webView != null) {
+                                Toast.makeText(MainActivity.this, "\u062a\u0645 \u062a\u062d\u062f\u064a\u062b \u0627\u0644\u062a\u0637\u0628\u064a\u0642 \u2728", Toast.LENGTH_SHORT).show();
+                                webView.loadUrl(startUrl());
                             }
-                        });
-                        return;
-                    }
-                    try {
-                        Thread.sleep(500);
-                    } catch (InterruptedException e) {
-                        return;
-                    }
+                        }
+                    });
                 }
             }
         });
@@ -197,50 +156,93 @@ public class MainActivity extends Activity implements Host.Listener {
         t.start();
     }
 
-    private boolean portOpen(int port) {
-        Socket s = new Socket();
-        try {
-            s.connect(new InetSocketAddress("127.0.0.1", port), 300);
-            return true;
-        } catch (Exception e) {
+    private boolean handleUrl(Uri uri) {
+        String scheme = uri.getScheme();
+        String host = uri.getHost();
+        if (ASSET_HOST.equals(host)) {
             return false;
-        } finally {
-            try {
-                s.close();
-            } catch (Exception ignored) {
+        }
+        if ("http".equals(scheme) || "https".equals(scheme)) {
+            if (!BUNDLED) {
+                return false;
             }
+            openExternal(uri);
+            return true;
+        }
+        if ("about".equals(scheme) || "data".equals(scheme) || "blob".equals(scheme) || "javascript".equals(scheme)) {
+            return false;
+        }
+        openExternal(uri);
+        return true;
+    }
+
+    private void openExternal(Uri uri) {
+        try {
+            startActivity(new Intent(Intent.ACTION_VIEW, uri));
+        } catch (Exception ignored) {
         }
     }
 
-    private void showWeb() {
-        if (showingWeb) {
-            return;
+    @SuppressWarnings("deprecation")
+    private void applyWindow() {
+        try {
+            getWindow().setStatusBarColor(Color.parseColor(STATUS_COLOR));
+        } catch (Exception ignored) {
         }
-        showingWeb = true;
-        webView = new WebView(this);
-        WebSettings s = webView.getSettings();
-        s.setJavaScriptEnabled(true);
-        s.setDomStorageEnabled(true);
-        webView.setWebViewClient(new WebViewClient());
-        frame.addView(webView, 0, new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
-        consoleView.setVisibility(View.GONE);
-        toggle.setVisibility(View.VISIBLE);
-        webView.loadUrl("http://127.0.0.1:" + WEB_PORT + "/");
+        View decor = getWindow().getDecorView();
+        int flags = decor.getSystemUiVisibility();
+        if (LIGHT_STATUS) {
+            flags |= View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR;
+        }
+        decor.setSystemUiVisibility(flags);
+        if (FULLSCREEN) {
+            enterImmersive();
+        }
     }
 
-    private void toggleView() {
-        if (webView == null) {
+    @SuppressWarnings("deprecation")
+    private void enterImmersive() {
+        getWindow().getDecorView().setSystemUiVisibility(
+                View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                        | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                        | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                        | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                        | View.SYSTEM_UI_FLAG_FULLSCREEN
+                        | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
+    }
+
+    @Override
+    public void onWindowFocusChanged(boolean hasFocus) {
+        super.onWindowFocusChanged(hasFocus);
+        if (hasFocus && FULLSCREEN) {
+            enterImmersive();
+        }
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        if (requestCode == FILE_REQ) {
+            if (fileCallback != null) {
+                fileCallback.onReceiveValue(WebChromeClient.FileChooserParams.parseResult(resultCode, data));
+                fileCallback = null;
+            }
             return;
         }
-        boolean webVisible = webView.getVisibility() == View.VISIBLE;
-        webView.setVisibility(webVisible ? View.GONE : View.VISIBLE);
-        consoleView.setVisibility(webVisible ? View.VISIBLE : View.GONE);
+        super.onActivityResult(requestCode, resultCode, data);
+    }
+
+    @Override
+    protected void onSaveInstanceState(Bundle outState) {
+        super.onSaveInstanceState(outState);
+        if (webView != null) {
+            webView.saveState(outState);
+        }
     }
 
     @SuppressWarnings("deprecation")
     @Override
     public void onBackPressed() {
-        if (showingWeb && webView != null && webView.getVisibility() == View.VISIBLE && webView.canGoBack()) {
+        if (webView != null && webView.canGoBack()) {
             webView.goBack();
         } else {
             super.onBackPressed();
@@ -248,8 +250,23 @@ public class MainActivity extends Activity implements Host.Listener {
     }
 
     @Override
+    protected void onPause() {
+        super.onPause();
+        if (webView != null) {
+            webView.onPause();
+        }
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (webView != null) {
+            webView.onResume();
+        }
+    }
+
+    @Override
     protected void onDestroy() {
-        Host.attach(null);
         if (webView != null) {
             webView.destroy();
             webView = null;
