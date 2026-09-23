@@ -7,9 +7,10 @@ import urllib.parse
 import firebase_admin
 from firebase_admin import credentials, firestore
 
-# تهيئة الفايربيس
+PROXY_URL = "http://127.0.0.1:8080"
 SERVICE_KEY_FILE = 'serviceAccountKey.json'
 
+# 1. تهيئة الفايربيس
 if not os.path.exists(SERVICE_KEY_FILE):
     print(f"❌ ملف المفتاح [{SERVICE_KEY_FILE}] غير موجود بنفس المجلد!")
     sys.exit(1)
@@ -22,16 +23,23 @@ except Exception as e:
     print(f"❌ خطأ في الاتصال بالفايربيس: {e}")
     sys.exit(1)
 
-def fetch_page(url):
-    headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-    }
-    req = urllib.request.Request(url, headers=headers)
+def fetch_via_proxy(url):
+    payload = json.dumps({'url': url}).encode('utf-8')
+    req = urllib.request.Request(
+        PROXY_URL, 
+        data=payload, 
+        headers={'Content-Type': 'application/json'}
+    )
     try:
-        with urllib.request.urlopen(req, timeout=15) as response:
-            return response.read().decode('utf-8', errors='ignore')
+        with urllib.request.urlopen(req, timeout=25) as resp:
+            data = json.loads(resp.read().decode('utf-8'))
+            if data.get('status') == 'success':
+                return data.get('html')
+            else:
+                print(f"❌ البروكسي رجّع خطأ: {data.get('message')}")
+                return None
     except Exception as e:
-        print(f"❌ خطأ بالوصول للرابط: {e}")
+        print(f"❌ تعذر الاتصال بتطبيق البروكسي (تأكد إنه شغال): {e}")
         return None
 
 def clean_chapter_name(text):
@@ -39,11 +47,11 @@ def clean_chapter_name(text):
     return f"الفصل {match.group(1)}" if match else text.strip()
 
 def process_chapter(manga_ref, ch_title, ch_url):
-    html = fetch_page(ch_url)
+    html = fetch_via_proxy(ch_url)
     if not html:
         return
     
-    # استخراج الصور باستخدام Regex بدون حاجتنا لـ BeautifulSoup
+    # استخراج رابط الصور بـ Regex
     images = re.findall(r'<img[^>]+(?:data-src|src)=["\']([^"\']+)["\']', html, re.IGNORECASE)
     images = [i.strip() for i in images if i and 'logo' not in i.lower() and 'avatar' not in i.lower()]
     
@@ -57,14 +65,14 @@ def process_chapter(manga_ref, ch_title, ch_url):
         }, merge=True)
         print(f"  └─ ✅ تم سحب: {ch_title} ({len(images)} صورة)")
 
-def scrape_url(url):
-    print(f"\n🚀 جاري جلب الرابط: {url}")
-    html = fetch_page(url)
+def scrape_manga(url):
+    print(f"\n🚀 جاري جلب المانجا عبر البروكسي: {url}")
+    html = fetch_via_proxy(url)
     if not html:
-        print("❌ تعذر الوصول لصفحة الرابط.")
+        print("❌ تعذر جلب الصفحة من البروكسي.")
         return
 
-    # استخراج العنوان بـ Regex
+    # استخراج اسم المانجا
     title_match = re.search(r'<h1[^>]*>(.*?)</h1>', html, re.DOTALL | re.IGNORECASE)
     if not title_match:
         print("❌ لم يتم العثور على اسم المانجا.")
@@ -80,7 +88,7 @@ def scrape_url(url):
         'updated_at': firestore.SERVER_TIMESTAMP
     }, merge=True)
 
-    # استخراج روابط الفصول بـ Regex
+    # استخراج الفصول
     chapter_matches = re.findall(r'<a[^>]+href=["\']([^"\']+)["\'][^>]*>(.*?)</a>', html, re.DOTALL | re.IGNORECASE)
     chapters = []
     for ch_url, ch_text in chapter_matches:
@@ -88,14 +96,14 @@ def scrape_url(url):
         if 'chapter' in ch_url.lower() or 'chapter' in clean_text.lower() or 'فصل' in clean_text.lower():
             chapters.append((clean_chapter_name(clean_text), ch_url))
 
-    print(f"📦 تم العثور على {len(chapters)} فصل لـ [{manga_title}]. جاري التحميل...")
+    print(f"📦 تم العثور على {len(chapters)} فصل لـ [{manga_title}]. جاري السحب...")
 
     for title, ch_url in chapters:
         process_chapter(manga_ref, title, ch_url)
 
     print(f"🎉 اكتمل سحب {manga_title} بنجاح!")
 
-def clean_database():
+def clean_duplicates():
     print("\n🧹 جاري فحص وتنظيف المكررات من قاعدة البيانات...")
     docs = list(db.collection('manga').stream())
     seen_keys = set()
@@ -120,7 +128,7 @@ def clean_database():
 def main_menu():
     while True:
         print("\n" + "="*40)
-        print("   🤖 سكريبت الموبايل لسحب وتنظيف المانجا")
+        print("   🤖 تطبيق السحب والتنظيف (المستقل)")
         print("="*40)
         print("1. سحب رابط مانجا / فصل")
         print("2. تنظيف المكررات من القاعدة")
@@ -131,7 +139,7 @@ def main_menu():
         if choice == '1':
             target_url = input("أدخل الرابط: ").strip()
             if target_url:
-                scrape_url(target_url)
+                scrape_manga(target_url)
         elif choice == '2':
             clean_database()
         elif choice == '3':
