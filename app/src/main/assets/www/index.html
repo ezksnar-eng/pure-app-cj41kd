@@ -41,7 +41,6 @@
     getFirestore, collection, doc, setDoc, getDocs, deleteDoc, serverTimestamp 
   } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-  // 1. إعدادات الفايربيس المباشرة لمشروعك
   const firebaseConfig = {
     apiKey: "AIzaSyBkaDrsjial5W6xyXPPt1-trJhR7E9n2p4",
     authDomain: "pure-library-2d45d.firebaseapp.com",
@@ -84,12 +83,27 @@
       return match ? `الفصل ${match[1]}` : text.trim();
   }
 
-  async function startScraper() {
-      const url = document.getElementById('targetUrl').value.trim();
-      if (!url) return alert('أدخل الرابط أولاً يمعود!');
+  // دالة تنظيف الرابط تلقائياً فور النسخ واللصق
+  function autoFixUrl(raw) {
+      if (!raw) return '';
+      let clean = raw.trim();
+      // حذف أي سلاشات أو رموز غريبة من البداية أوتوماتيكياً
+      clean = clean.replace(/^[^a-zA-Z0-9]+/, '');
+      if (!clean.startsWith('http://') && !clean.startsWith('https://')) {
+          clean = 'https://' + clean;
+      }
+      return clean;
+  }
 
-      log(`🚀 جاري جلب الصفحة عبر البروكسي...`);
-      const html = await fetchViaProxy(url);
+  async function startScraper() {
+      const rawInput = document.getElementById('targetUrl').value;
+      if (!rawInput.trim()) return alert('أدخل الرابط أولاً!');
+
+      // تصحيح وتنظيف الرابط المنسوخ تلقائياً
+      const cleanUrl = autoFixUrl(rawInput);
+
+      log(`🚀 جاري جلب الصفحة (${cleanUrl})...`);
+      const html = await fetchViaProxy(cleanUrl);
       if (!html) return;
 
       const parser = new DOMParser();
@@ -104,7 +118,7 @@
 
       await setDoc(mangaRef, {
           title: mangaTitle,
-          source_url: url,
+          source_url: cleanUrl,
           updated_at: serverTimestamp()
       }, { merge: true });
 
@@ -150,32 +164,49 @@
       log('🧹 جاري فحص وتنظيف المكررات من الفايربيس...');
       try {
           const snapshot = await getDocs(collection(db, 'manga'));
-          const seenKeys = new Set();
-          let deleted = 0;
+          
+          if (snapshot.empty) {
+              log('⚠️ لا توجد أي مانجا مخزنة في القاعدة حالياً.');
+              return;
+          }
+
+          const seenTitles = new Set();
+          let deletedCount = 0;
 
           for (const docItem of snapshot.docs) {
               const data = docItem.data();
-              const cleanTitle = (data.title || '').replace(/[^a-zA-Z0-9أ-ي]/g, '').toLowerCase();
-              const key = data.source_url || cleanTitle;
+              const cleanTitle = (data.title || docItem.id)
+                                  .toLowerCase()
+                                  .replace(/[^a-z0-9أ-ي]/g, '');
 
-              if (seenKeys.has(key)) {
+              if (seenTitles.has(cleanTitle)) {
+                  log(`🗑️ تم كشف مكرر: (${data.title || docItem.id}) .. جاري الحذف...`);
+                  
                   const chs = await getDocs(collection(db, 'manga', docItem.id, 'chapters'));
                   for (const c of chs.docs) {
                       await deleteDoc(c.ref);
                   }
+                  
                   await deleteDoc(docItem.ref);
-                  deleted++;
+                  deletedCount++;
               } else {
-                  if (key) seenKeys.add(key);
+                  if (cleanTitle) {
+                      seenTitles.add(cleanTitle);
+                  }
               }
           }
-          log(`✅ اكتمل التنظيف! تم حذف ${deleted} عمل مكرر.`);
+
+          if (deletedCount > 0) {
+              log(`✅ اكتمل التنظيف بنجاح! تم حذف ${deletedCount} عمل مكرر.`);
+          } else {
+              log(`ℹ️ القاعدة نظيفة تماماً ولا يوجد بها أي أعمال مكررة حالياً.`);
+          }
+
       } catch (err) {
           log(`❌ خطأ أثناء التنظيف: ${err.message}`);
       }
   }
 
-  // ربط الأزرار بالوظائف
   document.getElementById('btnScrape').addEventListener('click', startScraper);
   document.getElementById('btnClean').addEventListener('click', cleanDuplicates);
 </script>
