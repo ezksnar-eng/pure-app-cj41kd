@@ -25,7 +25,7 @@
 
   <div class="container">
     <h2>ساحب أزورا (الخلفية + مطابقة قاعدة البيانات) ⚡</h2>
-    <div class="status-badge" id="status">⚡ البروكسي والخدمة بالخلفية جاهزة...</div>
+    <div class="status-badge" id="status">⏳ يفحص نفسه...</div>
 
     <div class="controls">
       <button class="btn" id="startBtn">🚀 بدء سحب الأرشيف الشامل (25 عامل)</button>
@@ -48,13 +48,13 @@
     <div id="logBox">اضغط بدء لتشغيل الـ 25 عامل بالخلفية، أو "تعديل" لتنظيف قاعدة البيانات الحالية...</div>
   </div>
 
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-    import {
-      getFirestore, collection, addDoc, doc, updateDoc, deleteDoc,
-      query, where, getDocs, getDoc, serverTimestamp
-    } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
-
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+  <script>
+    // ============================================================
+    // Firebase Compat SDK — سكربتات عادية (مو ES module)، تشتغل من
+    // أي مكان (فتح مباشر للملف، WebView، APK) بدون مشاكل CORS/module
+    // ============================================================
     const firebaseConfig = {
       apiKey: "AIzaSyBkaDrsjial5W6xyXPPt1-trJhR7E9n2p4",
       authDomain: "pure-library-2d45d.firebaseapp.com",
@@ -64,8 +64,20 @@
       appId: "1:953898341477:web:85409f5597f894ff13e28c"
     };
 
-    const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+
+    // طبقة توافق صغيرة: نفس أسماء الدوال المألوفة (v9 modular)،
+    // بس شغالة فوق الـ compat SDK حتى ما نغيّر بقية الكود بالأسفل
+    function collection(_db, path) { return _db.collection(path); }
+    function doc(_db, path, id) { return _db.collection(path).doc(id); }
+    async function addDoc(collRef, data) { return collRef.add(data); }
+    async function updateDoc(ref, data) { return ref.update(data); }
+    async function deleteDoc(ref) { return ref.delete(); }
+    function where(field, op, value) { return q => q.where(field, op, value); }
+    function query(collRef, ...filters) { return filters.reduce((q, f) => f(q), collRef); }
+    async function getDocs(q) { return q.get(); }
+    function serverTimestamp() { return firebase.firestore.FieldValue.serverTimestamp(); }
 
     let mangaCount = 0, chapCount = 0, imgCount = 0, dupeCount = 0, fixedCount = 0, novelChapCount = 0;
     const processedUrls = new Set();
@@ -436,21 +448,3 @@
           const chAnchors = Array.from(mDoc.querySelectorAll('a'))
             .map(a => ({ url: cleanUrl(a.href || a.getAttribute('href')), txt: a.innerText.trim() }))
             .filter(c => c.url && (c.url.includes('chapter') || c.url.includes('/ch-') || c.txt.includes('فصل')));
-          const uniqueChaps = [];
-          chAnchors.forEach(c => { if (!uniqueChaps.some(x => x.url === c.url)) uniqueChaps.push(c); });
-
-          const newChaps = uniqueChaps.filter(c => !existingUrls.has(c.url));
-          for (let j = 0; j < newChaps.length; j++) {
-            const ch = newChaps[j];
-            const chapterTitle = cleanChapterTitle(ch.txt, chapsSnap.size + j + 1);
-            try {
-              const chDocPage = await fetchViaProxy(ch.url);
-              const { isNovel, images, content } = await extractChapterContent(chDocPage);
-              if (images.length > 0 || content.length > 0) {
-                await addDoc(collection(db, `manga/${it.id}/chapters`), {
-                  title: chapterTitle,
-                  sourceUrl: ch.url,
-                  isNovel, images, content,
-                  order: chapsSnap.size + j + 1
-                });
-                chap
