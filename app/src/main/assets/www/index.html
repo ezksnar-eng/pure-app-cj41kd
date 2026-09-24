@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
@@ -53,11 +52,15 @@
 <h1>📚 تطبيق مانهوا ازورا</h1>
 <p class="sub">سحب كامل (اسم، غلاف، تقييم، قصة، تصنيفات، فصول وصفحات) + مزامنة بدون تكرار + إصلاح الناقص تلقائياً — ملف واحد فقط، بدون سيرفر منفصل.</p>
 
+<div id="selfTestBanner" style="background:#1a2e1a; border:1px solid var(--ok); color:var(--ok); padding:10px 14px; border-radius:8px; margin-bottom:14px; font-size:13px;">
+  ⏳ يفحص نفسه...
+</div>
+
 <div class="panel">
   <div class="row">
     <div>
       <label>Firebase Web API Key (من Project Settings — ليس الملف الخاص)</label>
-      <input id="apiKey" placeholder="AIzaSy...">
+      <input id="apiKey" value="AIzaSyBkaDrsjial5W6xyXPPt1-trJhR7E9n2p4">
     </div>
     <div>
       <label>Project ID</label>
@@ -92,10 +95,11 @@
   </details>
 
   <div style="margin-top:10px">
-    <button id="startBtn" onclick="startRun()">🚀 ابدأ السحب والمزامنة</button>
-    <button class="secondary" onclick="purgeDuplicates()">🧹 حذف التكرار</button>
-    <button class="secondary" onclick="stopRun()">⛔ إيقاف</button>
-    <button class="secondary" onclick="testFetch()">🔌 اختبار الوصول للموقع</button>
+    <button onclick="testButtons()">🧪 اختبار: هل الأزرار تشتغل؟</button>
+    <button id="startBtn" onclick="safeCall(startRun)">🚀 ابدأ السحب والمزامنة</button>
+    <button class="secondary" onclick="safeCall(purgeDuplicates)">🧹 حذف التكرار</button>
+    <button class="secondary" onclick="safeCall(stopRun)">⛔ إيقاف</button>
+    <button class="secondary" onclick="safeCall(testFetch)">🔌 اختبار الوصول للموقع</button>
   </div>
 </div>
 
@@ -113,6 +117,43 @@
 </div>
 
 <script>
+// ============================================================
+// شبكة أمان: أي خطأ بأي زر لازم يبين للمستخدم، ما يضل صامت أبداً
+// ============================================================
+function safeCall(fn) {
+  try {
+    const result = fn();
+    if (result && typeof result.catch === 'function') {
+      result.catch(e => {
+        alert('صار خطأ: ' + e.message);
+        console.error(e);
+      });
+    }
+  } catch (e) {
+    alert('صار خطأ: ' + e.message);
+    console.error(e);
+  }
+}
+
+function testButtons() {
+  alert('✅ الأزرار تشتغل تمام. الوقت الحالي: ' + new Date().toLocaleTimeString('ar-IQ'));
+}
+
+window.addEventListener('load', () => {
+  const banner = document.getElementById('selfTestBanner');
+  try {
+    // فحص بسيط: هل fetch وDOMParser موجودين بهذا المتصفح/WebView؟
+    if (typeof fetch === 'undefined') throw new Error('fetch غير مدعوم بهذا المتصفح');
+    if (typeof DOMParser === 'undefined') throw new Error('DOMParser غير مدعوم بهذا المتصفح');
+    banner.textContent = '✅ الصفحة والكود شغالين تمام. اضغط "اختبار: هل الأزرار تشتغل؟" للتأكد، وبعدين "اختبار الوصول للموقع".';
+  } catch (e) {
+    banner.style.background = '#2e1a1a';
+    banner.style.borderColor = 'var(--err)';
+    banner.style.color = 'var(--err)';
+    banner.textContent = '❌ هذا المتصفح/الغلاف (WebView) ناقصه ميزات أساسية: ' + e.message + ' — جرب تفتح الملف بمتصفح Chrome عادي أول.';
+  }
+});
+
 // ============================================================
 // حالة عامة
 // ============================================================
@@ -142,10 +183,19 @@ const SEL = {
 // ============================================================
 // جلب صفحات بدون سيرفر خاص — بروكسي مخصص إذا موجود، وإلا خدمات مجانية
 // ============================================================
+// ملاحظة صادقة: ماكو 30 خدمة "بروكسي" مجانية موثوقة فعلاً بنفس الوقت —
+// أغلب الخدمات المجانية تنغلق أو تنحظر بسرعة. هذا التنويع يزيد فرصة
+// النجاح، بس تذكر: هذا يحل مشكلة CORS بس (يعني "الموقع ما يسمح
+// للمتصفح يوصله مباشرة"). إذا الموقع نفسه يسوي فحص Cloudflare حقيقي
+// (صفحة "تحقق أنك مو روبوت")، ولا وحدة من هذوله تعديها — هذا يحتاج
+// سيرفر حقيقي (proxy.py) بس مو أكثر بروكسيات هنا.
 const PUBLIC_RELAYS = [
   u => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
   u => `https://corsproxy.io/?url=${encodeURIComponent(u)}`,
   u => `https://thingproxy.freeboard.io/fetch/${u}`,
+  u => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(u)}`,
+  u => `https://cors.eu.org/${u}`,
+  u => `https://proxy.cors.sh/${u}`,
 ];
 
 async function fetchTarget(targetUrl, retries = 2) {
@@ -459,86 +509,4 @@ async function upsertSeries(series) {
 
   // مزامنة الفصول (upsert لكل فصل — ما يكرر الموجود)
   for (const ch of series.chapters) {
-    const chId = safeDocId(ch.title) || safeDocId(ch.url);
-    await firestoreWrite(`${docPath}/الفصول/${chId}`, {
-      'العنوان': ch.title,
-      'الرابط': ch.url,
-      'الصفحات': ch.pages,
-      'عدد_الصفحات': ch.pages.length,
-    });
-    stats.chapters++;
-  }
-
-  if (existing) {
-    stats.repaired++;
-    log(`🔧 أصلحت: ${series.title} (${Object.keys(changedFields).length - 1} حقل)`, 'warn');
-  } else {
-    stats.new++;
-    log(`✅ جديدة: ${series.title} — ${series.chapters.length} فصل`, 'ok');
-    existingTitleIndex.set(key, { id: docId, data: desiredFields });
-  }
-  renderStats();
-}
-
-// ============================================================
-// نظام الكائنات (Workers) + القفل
-// ============================================================
-function claim(url) {
-  if (inProgress.has(url)) return false;
-  inProgress.add(url);
-  return true;
-}
-function release(url) { inProgress.delete(url); }
-
-async function workerLoop(id) {
-  while (RUNNING) {
-    const url = queue.shift();
-    if (!url) { if (!queue.length) break; await new Promise(r => setTimeout(r, 300)); continue; }
-    if (!claim(url)) continue;
-
-    stats.active++;
-    renderStats();
-    try {
-      const series = await scrapeSeries(url);
-      if (series) {
-        await upsertSeries(series);
-      } else {
-        stats.failed++;
-        log(`❌ تعذر تحليل: ${url}`, 'err');
-      }
-    } catch (e) {
-      stats.failed++;
-      log(`❌ خطأ بكائن ${id}: ${e.message}`, 'err');
-    } finally {
-      release(url);
-      stats.active--;
-      renderStats();
-    }
-  }
-}
-
-async function startRun() {
-  if (RUNNING) return;
-  if (!document.getElementById('apiKey').value.trim()) {
-    log('❌ لازم تحط Firebase Web API Key أول.', 'err');
-    return;
-  }
-  RUNNING = true;
-  document.getElementById('startBtn').disabled = true;
-
-  try {
-    await buildTitleIndex();
-  } catch (e) {
-    log(`❌ فشل الاتصال بقاعدة البيانات: ${e.message}`, 'err');
-    RUNNING = false;
-    document.getElementById('startBtn').disabled = false;
-    return;
-  }
-
-  log('🚀 بدء الاكتشاف...');
-  const links = await discoverSeriesLinks();
-  log(`📚 مجموع الروابط المكتشفة: ${links.length}`);
-
-  if (links.length === 0) {
-    log('⚠️ ما وصلنا لأي رابط — جرب زر "اختبار الوصول للموقع" فوق لتعرف السبب.', 'warn');
-    RUNN
+    const chId =
