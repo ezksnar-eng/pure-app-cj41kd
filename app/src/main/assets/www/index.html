@@ -1,13 +1,14 @@
+
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>تطبيق سحب المانهوا</title>
+<title>تطبيق مانهوا ازورا — سحب ومزامنة</title>
 <style>
   :root{
     --bg:#0f1115; --panel:#171a21; --border:#2a2f3a; --text:#e6e8ec;
-    --muted:#8a8f9a; --accent:#4f8cff; --ok:#3ecf8e; --err:#ff5d5d;
+    --muted:#8a8f9a; --accent:#4f8cff; --ok:#3ecf8e; --err:#ff5d5d; --warn:#f5a524;
   }
   *{box-sizing:border-box}
   body{
@@ -29,38 +30,30 @@
   .row{display:flex; gap:10px; flex-wrap:wrap}
   .row > div{flex:1; min-width:160px}
   button{
-    background:var(--accent); color:#fff; border:none; padding:9px 16px;
-    border-radius:6px; font-size:13px; cursor:pointer;
+    background:var(--accent); color:#fff; border:none; padding:10px 18px;
+    border-radius:6px; font-size:13px; cursor:pointer; margin:4px 6px 4px 0;
   }
   button:disabled{opacity:.5; cursor:not-allowed}
   button.secondary{background:#2a2f3a}
-  .stats{display:flex; gap:14px; flex-wrap:wrap; margin:12px 0}
-  .stat{background:#0d0f14; border:1px solid var(--border); border-radius:8px; padding:10px 14px; min-width:110px}
+  details{margin-top:6px}
+  summary{color:var(--muted); font-size:12px; cursor:pointer; margin-bottom:8px}
+  .stats{display:flex; gap:12px; flex-wrap:wrap; margin:12px 0}
+  .stat{background:#0d0f14; border:1px solid var(--border); border-radius:8px; padding:10px 14px; min-width:100px}
   .stat b{display:block; font-size:20px}
   .stat span{color:var(--muted); font-size:11px}
   #log{
-    height:260px; overflow-y:auto; background:#0d0f14; border:1px solid var(--border);
-    border-radius:8px; padding:10px; font-size:12px; font-family:monospace; line-height:1.6;
+    height:300px; overflow-y:auto; background:#0d0f14; border:1px solid var(--border);
+    border-radius:8px; padding:10px; font-size:12px; font-family:monospace; line-height:1.7;
   }
-  .ok{color:var(--ok)} .err{color:var(--err)} .muted{color:var(--muted)}
+  .ok{color:var(--ok)} .err{color:var(--err)} .muted{color:var(--muted)} .warn{color:var(--warn)}
 </style>
 </head>
 <body>
 
-<h1>تطبيق سحب المانهوا — 616 كائن</h1>
-<p class="sub">يسحب كل مانهوا من أرشيف ازورا عبر البروكسي، ويرفعها لـ Firestore بدون تكرار.</p>
+<h1>📚 تطبيق مانهوا ازورا</h1>
+<p class="sub">سحب كامل (اسم، غلاف، تقييم، قصة، تصنيفات، فصول وصفحات) + مزامنة بدون تكرار + إصلاح الناقص تلقائياً — ملف واحد فقط، بدون سيرفر منفصل.</p>
 
 <div class="panel">
-  <div class="row">
-    <div>
-      <label>رابط البروكسي (proxy.py)</label>
-      <input id="proxyUrl" value="http://127.0.0.1:8000/fetch">
-    </div>
-    <div>
-      <label>رابط أرشيف السلاسل</label>
-      <input id="seriesUrl" value="https://azorafly.com/series/">
-    </div>
-  </div>
   <div class="row">
     <div>
       <label>Firebase Web API Key (من Project Settings — ليس الملف الخاص)</label>
@@ -73,23 +66,44 @@
   </div>
   <div class="row">
     <div>
+      <label>رابط أرشيف السلاسل</label>
+      <input id="seriesUrl" value="https://azorafly.com/series/">
+    </div>
+    <div>
       <label>عدد الكائنات (Workers)</label>
       <input id="workerCount" value="616" type="number">
     </div>
+  </div>
+  <div class="row">
     <div>
       <label>أقصى صفحات أرشيف</label>
       <input id="maxPages" value="50" type="number">
     </div>
+    <div>
+      <label>اسم المجموعة بقاعدة البيانات</label>
+      <input id="collectionName" value="مانغا">
+    </div>
   </div>
-  <button id="startBtn" onclick="startRun()">🚀 ابدأ السحب</button>
-  <button class="secondary" onclick="purgeDuplicates()">🧹 حذف التكرار</button>
-  <button class="secondary" onclick="stopRun()">⛔ إيقاف</button>
+
+  <details>
+    <summary>⚙️ إعدادات متقدمة (اختياري — اتركها فاضية إذا مو متأكد)</summary>
+    <label>رابط بروكسي خاص بيك (proxy.py مستضاف على سيرفر) — إذا فاضي، التطبيق يجرب طرق مجانية بديلة تلقائياً</label>
+    <input id="customProxy" placeholder="مثال: https://myproxy.onrender.com/fetch">
+  </details>
+
+  <div style="margin-top:10px">
+    <button id="startBtn" onclick="startRun()">🚀 ابدأ السحب والمزامنة</button>
+    <button class="secondary" onclick="purgeDuplicates()">🧹 حذف التكرار</button>
+    <button class="secondary" onclick="stopRun()">⛔ إيقاف</button>
+    <button class="secondary" onclick="testFetch()">🔌 اختبار الوصول للموقع</button>
+  </div>
 </div>
 
 <div class="stats">
-  <div class="stat"><b id="stSeries">0</b><span>مانهوا مسحوبة</span></div>
-  <div class="stat"><b id="stChapters">0</b><span>فصل</span></div>
-  <div class="stat"><b id="stSkipped">0</b><span>متجاوزة (موجودة)</span></div>
+  <div class="stat"><b id="stNew">0</b><span>مانهوا جديدة</span></div>
+  <div class="stat"><b id="stRepaired">0</b><span>تم إصلاحها</span></div>
+  <div class="stat"><b id="stComplete">0</b><span>مكتملة مسبقاً</span></div>
+  <div class="stat"><b id="stChapters">0</b><span>فصل تمت مزامنته</span></div>
   <div class="stat"><b id="stFailed">0</b><span>فشل</span></div>
   <div class="stat"><b id="stActive">0</b><span>كائن نشط الآن</span></div>
 </div>
@@ -100,16 +114,17 @@
 
 <script>
 // ============================================================
-// إعدادات وحالة عامة
+// حالة عامة
 // ============================================================
 let RUNNING = false;
 let idToken = null;
+let existingTitleIndex = new Map(); // normalized title -> {id, data}
 
-const inProgress = new Set();      // قفل: مانهوا قيد المعالجة حالياً
-const queue = [];                  // روابط السلاسل بالانتظار
-const stats = { series: 0, chapters: 0, skipped: 0, failed: 0, active: 0 };
+const inProgress = new Set();
+const queue = [];
+const stats = { new: 0, repaired: 0, complete: 0, chapters: 0, failed: 0, active: 0 };
 
-// selectors تخص تصميم الموقع — عدّلها إذا اختلف شكل صفحات azorafly.com
+// selectors تخص تصميم موقع azorafly.com — عدّلها إذا اختلف شكل الصفحات
 const SEL = {
   listingCard: 'div.page-item-detail',
   listingLink: 'h3.h5 a, .post-title a',
@@ -117,10 +132,61 @@ const SEL = {
   title: 'h1.entry-title, div.post-title h1',
   score: '.score, .rating .score, span.total_votes',
   cover: 'div.summary_image img, div.thumb img',
+  description: '.summary__content, .description-summary .summary__content',
   genres: '.genres-content a, .summary-content .genres a',
+  status: '.summary-content .post-status .summary-content, .post-status div.summary-content',
   chapterRow: 'li.wp-manga-chapter a, ul.main.version-chap li a',
   pageImage: 'div.reader-area img, div#readerarea img, div.page-break img',
 };
+
+// ============================================================
+// جلب صفحات بدون سيرفر خاص — بروكسي مخصص إذا موجود، وإلا خدمات مجانية
+// ============================================================
+const PUBLIC_RELAYS = [
+  u => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
+  u => `https://corsproxy.io/?url=${encodeURIComponent(u)}`,
+  u => `https://thingproxy.freeboard.io/fetch/${u}`,
+];
+
+async function fetchTarget(targetUrl, retries = 2) {
+  const customProxy = document.getElementById('customProxy').value.trim();
+  const attempts = customProxy
+    ? [() => `${customProxy}?url=${encodeURIComponent(targetUrl)}`]
+    : PUBLIC_RELAYS;
+
+  for (let round = 0; round < retries; round++) {
+    for (const buildUrl of attempts) {
+      try {
+        const res = await fetch(buildUrl(targetUrl), { headers: { 'Accept': 'text/html' } });
+        if (res.ok) {
+          const text = await res.text();
+          // لو رجعت صفحة تحقق Cloudflare بدل المحتوى الحقيقي
+          if (text.includes('Just a moment') || text.includes('cf-browser-verification')) {
+            log(`⚠️ الموقع رجّع صفحة تحقق Cloudflare بدل المحتوى — هذا يحتاج سيرفر بروكسي حقيقي (راجع الشرح فوق).`, 'warn');
+            return null;
+          }
+          if (text.length > 200) return text;
+        }
+      } catch (e) { /* جرب الطريقة الجاية */ }
+    }
+    await new Promise(r => setTimeout(r, 1200));
+  }
+  return null;
+}
+
+async function testFetch() {
+  log('🔌 يفحص الوصول لـ azorafly.com...');
+  const html = await fetchTarget(document.getElementById('seriesUrl').value.trim());
+  if (html) {
+    log(`✅ نجح! وصل محتوى الصفحة (${html.length} حرف).`, 'ok');
+  } else {
+    log('❌ فشل الوصول — إما الموقع محمي بـ Cloudflare قوي، أو الخدمات المجانية محظورة مؤقتاً. جرب لاحقاً أو استخدم بروكسي خاص بحقل الإعدادات المتقدمة.', 'err');
+  }
+}
+
+function parseHTML(html) {
+  return new DOMParser().parseFromString(html, 'text/html');
+}
 
 function log(msg, cls) {
   const el = document.getElementById('log');
@@ -133,45 +199,29 @@ function log(msg, cls) {
 }
 
 function renderStats() {
-  document.getElementById('stSeries').textContent = stats.series;
+  document.getElementById('stNew').textContent = stats.new;
+  document.getElementById('stRepaired').textContent = stats.repaired;
+  document.getElementById('stComplete').textContent = stats.complete;
   document.getElementById('stChapters').textContent = stats.chapters;
-  document.getElementById('stSkipped').textContent = stats.skipped;
   document.getElementById('stFailed').textContent = stats.failed;
   document.getElementById('stActive').textContent = stats.active;
 }
 
+// ============================================================
+// أدوات نصية
+// ============================================================
 function safeDocId(text) {
   if (!text) return 'manga_doc';
   let s = text.normalize('NFKC').trim().toLowerCase();
   s = s.replace(/[^\w\u0600-\u06FF]+/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '');
   return (s || 'manga_doc').slice(0, 150);
 }
-
-function normalizeUrl(u) {
-  if (!u) return '';
-  u = u.trim().toLowerCase().split('#')[0];
-  return u.endsWith('/') ? u.slice(0, -1) : u;
+function normalizeText(t) {
+  if (!t) return '';
+  return String(t).normalize('NFKC').trim().toLowerCase().replace(/\s+/g, ' ');
 }
-
-// ============================================================
-// جلب صفحات عبر البروكسي
-// ============================================================
-async function fetchViaProxy(targetUrl, retries = 3) {
-  const proxyBase = document.getElementById('proxyUrl').value.trim();
-  for (let attempt = 1; attempt <= retries; attempt++) {
-    try {
-      const res = await fetch(`${proxyBase}?url=${encodeURIComponent(targetUrl)}`);
-      if (res.ok) return await res.text();
-    } catch (e) {
-      // تجاهل ونعيد المحاولة
-    }
-    await new Promise(r => setTimeout(r, 1500 * attempt));
-  }
-  return null;
-}
-
-function parseHTML(html) {
-  return new DOMParser().parseFromString(html, 'text/html');
+function encodeFsPath(path) {
+  return path.split('/').map(encodeURIComponent).join('/');
 }
 
 // ============================================================
@@ -198,17 +248,28 @@ function toFirestoreValue(v) {
   if (Array.isArray(v)) return { arrayValue: { values: v.map(toFirestoreValue) } };
   return { stringValue: String(v) };
 }
-
 function toFirestoreFields(obj) {
   const fields = {};
   for (const [k, val] of Object.entries(obj)) fields[k] = toFirestoreValue(val);
   return { fields };
 }
+function fieldsToObj(doc) {
+  const out = {};
+  const fields = (doc && doc.fields) || {};
+  for (const [k, v] of Object.entries(fields)) {
+    if ('stringValue' in v) out[k] = v.stringValue;
+    else if ('integerValue' in v) out[k] = parseInt(v.integerValue, 10);
+    else if ('doubleValue' in v) out[k] = v.doubleValue;
+    else if ('booleanValue' in v) out[k] = v.booleanValue;
+    else if ('arrayValue' in v) out[k] = (v.arrayValue.values || []).map(x => x.stringValue ?? x.integerValue ?? '');
+  }
+  return out;
+}
 
 async function firestoreWrite(path, obj) {
   const projectId = document.getElementById('projectId').value.trim();
   const token = await ensureAuth();
-  const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/${path}?updateMask.fieldPaths=` +
+  const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/${encodeFsPath(path)}?updateMask.fieldPaths=` +
               Object.keys(obj).map(encodeURIComponent).join('&updateMask.fieldPaths=');
   const res = await fetch(url, {
     method: 'PATCH',
@@ -219,23 +280,13 @@ async function firestoreWrite(path, obj) {
   return res.json();
 }
 
-async function firestoreGet(path) {
-  const projectId = document.getElementById('projectId').value.trim();
-  const token = await ensureAuth();
-  const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/${path}`;
-  const res = await fetch(url, { headers: { 'Authorization': `Bearer ${token}` } });
-  if (res.status === 404) return null;
-  if (!res.ok) throw new Error(`Firestore get failed (${res.status})`);
-  return res.json();
-}
-
 async function firestoreListCollection(name) {
   const projectId = document.getElementById('projectId').value.trim();
   const token = await ensureAuth();
   let docs = [];
   let pageToken = null;
   do {
-    const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/${name}` +
+    const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/${encodeFsPath(name)}` +
                 `?pageSize=300${pageToken ? '&pageToken=' + pageToken : ''}`;
     const res = await fetch(url, { headers: { 'Authorization': `Bearer ${token}` } });
     if (!res.ok) throw new Error(`Firestore list failed (${res.status})`);
@@ -249,21 +300,31 @@ async function firestoreListCollection(name) {
 async function firestoreDelete(path) {
   const projectId = document.getElementById('projectId').value.trim();
   const token = await ensureAuth();
-  const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/${path}`;
+  const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/${encodeFsPath(path)}`;
   await fetch(url, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
 }
 
-function fieldsToObj(doc) {
-  const out = {};
-  const fields = (doc && doc.fields) || {};
-  for (const [k, v] of Object.entries(fields)) {
-    if ('stringValue' in v) out[k] = v.stringValue;
-    else if ('integerValue' in v) out[k] = parseInt(v.integerValue, 10);
-    else if ('doubleValue' in v) out[k] = v.doubleValue;
-    else if ('booleanValue' in v) out[k] = v.booleanValue;
-    else if ('arrayValue' in v) out[k] = (v.arrayValue.values || []).map(x => x.stringValue ?? x.integerValue ?? '');
+// ============================================================
+// بناء فهرس العناوين الموجودة بقاعدة البيانات (مرة وحدة بأول تشغيل)
+// حتى نلكم السلاسل القديمة اللي عندها IDs عشوائية، مو بس الجديدة
+// ============================================================
+async function buildTitleIndex() {
+  const collectionName = document.getElementById('collectionName').value.trim();
+  log('📇 يبني فهرس العناوين الموجودة بقاعدة البيانات...');
+  let docs = [];
+  try {
+    docs = await firestoreListCollection(collectionName);
+  } catch (e) {
+    log(`⚠️ ما كدرت أقرا المجموعة (ربما فاضية لسه): ${e.message}`, 'warn');
   }
-  return out;
+  existingTitleIndex.clear();
+  for (const d of docs) {
+    const id = d.name.split('/').pop();
+    const data = fieldsToObj(d);
+    const key = normalizeText(data['عنوان']);
+    if (key) existingTitleIndex.set(key, { id, data });
+  }
+  log(`📇 الفهرس جاهز: ${existingTitleIndex.size} مانهوا موجودة مسبقاً.`);
 }
 
 // ============================================================
@@ -280,7 +341,7 @@ async function discoverSeriesLinks() {
     if (!url || seenPages.has(url)) break;
     seenPages.add(url);
 
-    const html = await fetchViaProxy(url);
+    const html = await fetchTarget(url);
     if (!html) { log(`فشل جلب صفحة الأرشيف: ${url}`, 'err'); break; }
 
     const doc = parseHTML(html);
@@ -289,7 +350,7 @@ async function discoverSeriesLinks() {
       if (a && a.href) links.add(a.href);
     });
 
-    log(`صفحة ${i + 1}: وجدت ${links.size} رابط تراكمي`);
+    log(`📄 صفحة ${i + 1}: ${links.size} رابط تراكمي`);
     const nextEl = doc.querySelector(SEL.nextPage);
     url = nextEl ? nextEl.href : null;
   }
@@ -300,7 +361,7 @@ async function discoverSeriesLinks() {
 // سحب مانهوا وحدة + كل فصولها وصفحاتها
 // ============================================================
 async function scrapeSeries(url) {
-  const html = await fetchViaProxy(url);
+  const html = await fetchTarget(url);
   if (!html) return null;
 
   const doc = parseHTML(html);
@@ -310,17 +371,17 @@ async function scrapeSeries(url) {
   const title = titleEl.textContent.trim();
   const scoreEl = doc.querySelector(SEL.score);
   const coverEl = doc.querySelector(SEL.cover);
+  const descEl = doc.querySelector(SEL.description);
   const genreEls = [...doc.querySelectorAll(SEL.genres)];
   const chapterRows = [...doc.querySelectorAll(SEL.chapterRow)];
 
   const series = {
     title,
-    slug: safeDocId(title),
     source_url: url,
-    source_url_normalized: normalizeUrl(url),
+    cover: coverEl ? (coverEl.getAttribute('data-src') || coverEl.src || '') : '',
     score: scoreEl ? scoreEl.textContent.trim() : '',
-    cover_url: coverEl ? (coverEl.getAttribute('data-src') || coverEl.src || '') : '',
-    genres: genreEls.map(g => g.textContent.trim()),
+    description: descEl ? descEl.textContent.trim() : '',
+    genres: genreEls.map(g => g.textContent.trim()).filter(Boolean),
     chapters: [],
   };
 
@@ -336,7 +397,7 @@ async function scrapeSeries(url) {
 }
 
 async function scrapeChapterPages(chapterUrl) {
-  const html = await fetchViaProxy(chapterUrl);
+  const html = await fetchTarget(chapterUrl);
   if (!html) return [];
   const doc = parseHTML(html);
   const pages = [];
@@ -348,49 +409,81 @@ async function scrapeChapterPages(chapterUrl) {
 }
 
 // ============================================================
-// رفع لـ Firestore بدون تكرار
+// رفع لـ Firestore مع نظام تحقق وإصلاح (verify & repair)
 // ============================================================
 async function upsertSeries(series) {
-  const existing = await firestoreGet(`manga/${series.slug}`);
+  const collectionName = document.getElementById('collectionName').value.trim();
+  const key = normalizeText(series.title);
+  const existing = existingTitleIndex.get(key);
+
+  const docId = existing ? existing.id : safeDocId(series.title);
+  const docPath = `${collectionName}/${docId}`;
+
+  const desiredFields = {
+    'عنوان': series.title,
+    'غطاء': series.cover,
+    'قصة': series.description,
+    'تقييم': series.score,
+    'تصنيفات': series.genres,
+    'المصدر URL': series.source_url,
+    'موقع المصدر': 'أزورا',
+    'يكتب': 'مانهوا',
+    'عدد_الفصول': series.chapters.length,
+  };
+
+  let changedFields = {};
   if (existing) {
-    const prev = fieldsToObj(existing);
-    if (prev.chapter_count === series.chapters.length) {
-      stats.skipped++;
-      log(`⏭️ تجاوز: ${series.title} (موجودة ومحدّثة)`, 'muted');
-      return;
+    for (const [k, v] of Object.entries(desiredFields)) {
+      const current = existing.data[k];
+      const isEmpty = current === undefined || current === null || current === '' ||
+                      (Array.isArray(current) && current.length === 0);
+      if (isEmpty && (Array.isArray(v) ? v.length > 0 : !!v)) {
+        changedFields[k] = v; // يملأ فراغ ناقص
+      } else if (k === 'عدد_الفصول' && current !== v) {
+        changedFields[k] = v; // يصحح عدد الفصول لو تغيّر
+      }
     }
+  } else {
+    changedFields = desiredFields;
   }
 
-  await firestoreWrite(`manga/${series.slug}`, {
-    title: series.title,
-    title_normalized: series.title.normalize('NFKC').trim().toLowerCase(),
-    source_url: series.source_url,
-    source_url_normalized: series.source_url_normalized,
-    score: series.score,
-    cover_url: series.cover_url,
-    genres: series.genres,
-    chapter_count: series.chapters.length,
-  });
+  if (existing && Object.keys(changedFields).length === 0) {
+    stats.complete++;
+    log(`✅ مكتملة مسبقاً: ${series.title}`, 'muted');
+    renderStats();
+    return;
+  }
 
+  changedFields['تم_التحديث'] = new Date().toISOString();
+  await firestoreWrite(docPath, changedFields);
+
+  // مزامنة الفصول (upsert لكل فصل — ما يكرر الموجود)
   for (const ch of series.chapters) {
     const chId = safeDocId(ch.title) || safeDocId(ch.url);
-    await firestoreWrite(`manga/${series.slug}/chapters/${chId}`, {
-      title: ch.title,
-      url: ch.url,
-      pages: ch.pages,
-      page_count: ch.pages.length,
+    await firestoreWrite(`${docPath}/الفصول/${chId}`, {
+      'العنوان': ch.title,
+      'الرابط': ch.url,
+      'الصفحات': ch.pages,
+      'عدد_الصفحات': ch.pages.length,
     });
+    stats.chapters++;
   }
 
-  stats.series++;
-  stats.chapters += series.chapters.length;
-  log(`✅ ${series.title} — ${series.chapters.length} فصل`, 'ok');
+  if (existing) {
+    stats.repaired++;
+    log(`🔧 أصلحت: ${series.title} (${Object.keys(changedFields).length - 1} حقل)`, 'warn');
+  } else {
+    stats.new++;
+    log(`✅ جديدة: ${series.title} — ${series.chapters.length} فصل`, 'ok');
+    existingTitleIndex.set(key, { id: docId, data: desiredFields });
+  }
+  renderStats();
 }
 
 // ============================================================
 // نظام الكائنات (Workers) + القفل
 // ============================================================
-async function claim(url) {
+function claim(url) {
   if (inProgress.has(url)) return false;
   inProgress.add(url);
   return true;
@@ -400,9 +493,8 @@ function release(url) { inProgress.delete(url); }
 async function workerLoop(id) {
   while (RUNNING) {
     const url = queue.shift();
-    if (!url) { await new Promise(r => setTimeout(r, 300)); if (!queue.length) break; continue; }
-
-    if (!(await claim(url))) continue; // كائن ثاني ياخذها، تجاوز
+    if (!url) { if (!queue.length) break; await new Promise(r => setTimeout(r, 300)); continue; }
+    if (!claim(url)) continue;
 
     stats.active++;
     renderStats();
@@ -423,76 +515,30 @@ async function workerLoop(id) {
       renderStats();
     }
   }
-  stats.active = Math.max(0, stats.active); // احتياط
 }
 
 async function startRun() {
   if (RUNNING) return;
+  if (!document.getElementById('apiKey').value.trim()) {
+    log('❌ لازم تحط Firebase Web API Key أول.', 'err');
+    return;
+  }
   RUNNING = true;
   document.getElementById('startBtn').disabled = true;
-  log('🚀 بدء الاكتشاف...');
 
+  try {
+    await buildTitleIndex();
+  } catch (e) {
+    log(`❌ فشل الاتصال بقاعدة البيانات: ${e.message}`, 'err');
+    RUNNING = false;
+    document.getElementById('startBtn').disabled = false;
+    return;
+  }
+
+  log('🚀 بدء الاكتشاف...');
   const links = await discoverSeriesLinks();
   log(`📚 مجموع الروابط المكتشفة: ${links.length}`);
-  queue.push(...links);
 
-  const workerCount = Math.min(parseInt(document.getElementById('workerCount').value, 10) || 616, Math.max(1, links.length));
-  log(`👷 تشغيل ${workerCount} كائن...`);
-
-  const workers = [];
-  for (let i = 0; i < workerCount; i++) workers.push(workerLoop(i));
-  await Promise.all(workers);
-
-  log('🎉 انتهت جولة السحب.', 'ok');
-  document.getElementById('startBtn').disabled = false;
-  RUNNING = false;
-}
-
-function stopRun() {
-  RUNNING = false;
-  log('⛔ تم إيقاف التشغيل (الكائنات الحالية تكمل شغلها الحالي بس ما تاخذ جديد).', 'muted');
-  document.getElementById('startBtn').disabled = false;
-}
-
-// ============================================================
-// حذف التكرار (Duplicate Purger)
-// ============================================================
-async function purgeDuplicates() {
-  log('🔍 فحص التكرار...');
-  const docs = await firestoreListCollection('manga');
-  const parsed = docs.map(d => ({
-    id: d.name.split('/').pop(),
-    ref: d.name,
-    data: fieldsToObj(d),
-  }));
-
-  const groups = new Map(); // key -> [docs]
-  for (const doc of parsed) {
-    const key = doc.data.title_normalized || doc.data.source_url_normalized;
-    if (!key) continue;
-    if (!groups.has(key)) groups.set(key, []);
-    groups.get(key).push(doc);
-  }
-
-  let removed = 0, keptGroups = 0;
-  for (const [, group] of groups) {
-    if (group.length < 2) continue;
-    keptGroups++;
-    group.sort((a, b) => (b.data.chapter_count || 0) - (a.data.chapter_count || 0));
-    const keep = group[0];
-    for (const dupe of group.slice(1)) {
-      // حذف sub-collection الفصول أولاً
-      const chapters = await firestoreListCollection(`manga/${dupe.id}/chapters`).catch(() => []);
-      for (const ch of chapters) await firestoreDelete(ch.name.replace(/^.*\/documents\//, ''));
-      await firestoreDelete(`manga/${dupe.id}`);
-      removed++;
-      log(`🗑️ حذف نسخة مكررة: ${dupe.data.title || dupe.id}`, 'err');
-    }
-    log(`✅ أبقيت: ${keep.data.title || keep.id}`, 'ok');
-  }
-
-  log(`🎉 التنظيف خلص — مجاميع مكررة: ${keptGroups} | محذوف: ${removed}`, 'ok');
-}
-</script>
-</body>
-</html>
+  if (links.length === 0) {
+    log('⚠️ ما وصلنا لأي رابط — جرب زر "اختبار الوصول للموقع" فوق لتعرف السبب.', 'warn');
+    RUNN
