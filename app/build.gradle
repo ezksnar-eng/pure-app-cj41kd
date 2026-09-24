@@ -10,7 +10,7 @@ android {
         applicationId 'com.pure.appcj41kd'
         minSdk 24
         targetSdk 34
-        versionCode 43
+        versionCode 44
         versionName '1.0.0'
     }
 

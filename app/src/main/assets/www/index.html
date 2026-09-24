@@ -15,9 +15,10 @@
     .stat-card h3 { margin: 0; color: var(--main); font-size: 20px; }
     .stat-card p { margin: 3px 0 0; font-size: 11px; color: #888; }
     #logBox { font-size: 12px; color: #64b5f6; white-space: pre-line; text-align: right; background: #060608; padding: 12px; border-radius: 10px; height: 380px; overflow-y: auto; border: 1px solid var(--border); font-family: monospace; line-height: 1.6; }
-    .controls { display: flex; gap: 10px; margin-bottom: 10px; }
+    .controls { display: flex; gap: 10px; margin-bottom: 15px; }
     .btn { flex: 1; padding: 12px; border-radius: 10px; border: none; font-weight: bold; cursor: pointer; background: var(--main); color: #000; font-size: 15px; }
-    .btn.fix { background: var(--ok); }
+    .btn.stop { background: #e53935; color: #fff; }
+    .btn.fix { background: var(--ok); color: #000; }
     .btn:disabled { opacity: 0.5; cursor: not-allowed; }
   </style>
 </head>
@@ -25,10 +26,11 @@
 
   <div class="container">
     <h2>ساحب أزورا (الخلفية + مطابقة قاعدة البيانات) ⚡</h2>
-    <div class="status-badge" id="status">⏳ يفحص نفسه...</div>
+    <div class="status-badge" id="status">⚡ البروكسي والخدمة بالخلفية جاهزة...</div>
 
     <div class="controls">
       <button class="btn" id="startBtn">🚀 بدء سحب الأرشيف الشامل (25 عامل)</button>
+      <button class="btn stop" id="stopBtn" disabled>⛔ إيقاف</button>
     </div>
     <div class="controls">
       <button class="btn fix" id="fixBtn">🛠️ تعديل (حذف التكرار + إصلاح الناقص)</button>
@@ -40,21 +42,24 @@
       <div class="stat-card"><h3 id="statImgs">0</h3><p>صور مرفوعة</p></div>
     </div>
     <div class="grid-stats">
+      <div class="stat-card"><h3 id="statFailed">0</h3><p>فشل</p></div>
       <div class="stat-card"><h3 id="statDupes">0</h3><p>مكررات محذوفة</p></div>
       <div class="stat-card"><h3 id="statFixed">0</h3><p>أعمال تم إصلاحها</p></div>
+    </div>
+    <div class="grid-stats">
       <div class="stat-card"><h3 id="statNovels">0</h3><p>فصول روايات (نص)</p></div>
     </div>
 
     <div id="logBox">اضغط بدء لتشغيل الـ 25 عامل بالخلفية، أو "تعديل" لتنظيف قاعدة البيانات الحالية...</div>
   </div>
 
-  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
-  <script>
-    // ============================================================
-    // Firebase Compat SDK — سكربتات عادية (مو ES module)، تشتغل من
-    // أي مكان (فتح مباشر للملف، WebView، APK) بدون مشاكل CORS/module
-    // ============================================================
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import {
+      getFirestore, collection, addDoc, doc, updateDoc, deleteDoc,
+      query, where, getDocs, serverTimestamp
+    } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
     const firebaseConfig = {
       apiKey: "AIzaSyBkaDrsjial5W6xyXPPt1-trJhR7E9n2p4",
       authDomain: "pure-library-2d45d.firebaseapp.com",
@@ -64,24 +69,14 @@
       appId: "1:953898341477:web:85409f5597f894ff13e28c"
     };
 
-    firebase.initializeApp(firebaseConfig);
-    const db = firebase.firestore();
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
 
-    // طبقة توافق صغيرة: نفس أسماء الدوال المألوفة (v9 modular)،
-    // بس شغالة فوق الـ compat SDK حتى ما نغيّر بقية الكود بالأسفل
-    function collection(_db, path) { return _db.collection(path); }
-    function doc(_db, path, id) { return _db.collection(path).doc(id); }
-    async function addDoc(collRef, data) { return collRef.add(data); }
-    async function updateDoc(ref, data) { return ref.update(data); }
-    async function deleteDoc(ref) { return ref.delete(); }
-    function where(field, op, value) { return q => q.where(field, op, value); }
-    function query(collRef, ...filters) { return filters.reduce((q, f) => f(q), collRef); }
-    async function getDocs(q) { return q.get(); }
-    function serverTimestamp() { return firebase.firestore.FieldValue.serverTimestamp(); }
-
-    let mangaCount = 0, chapCount = 0, imgCount = 0, dupeCount = 0, fixedCount = 0, novelChapCount = 0;
+    let mangaCount = 0, chapCount = 0, imgCount = 0, failCount = 0;
+    let dupeCount = 0, fixedCount = 0, novelChapCount = 0;
     const processedUrls = new Set();
     const CONCURRENCY_LIMIT = 25; // 25 عامل موازي
+    let RUNNING = false; // علامة الإيقاف (تشتغل للسحب وللتعديل)
 
     async function requestWakeLock() {
       try {
@@ -93,6 +88,12 @@
       const b = document.getElementById('logBox');
       b.innerText += "\n> " + txt;
       b.scrollTop = b.scrollHeight;
+    }
+
+    function markFailed(reason) {
+      failCount++;
+      document.getElementById('statFailed').innerText = failCount;
+      if (reason) printLog(`  ❌ [فشل]: ${reason}`);
     }
 
     function cleanUrl(url) {
@@ -120,28 +121,9 @@
       const text = (rawText || '').trim();
       const m = text.match(/(?:الفصل|فصل|chapter|ch\.?)\s*(\d+(?:\.\d+)?)/i);
       if (m) return `الفصل ${m[1]}`;
-      // لو ماكو كلمة "فصل" بس اللقطة تبدأ برقم، خذ الرقم بس
       const numOnly = text.match(/^(\d+(?:\.\d+)?)/);
       if (numOnly) return `الفصل ${numOnly[1]}`;
       return `الفصل ${fallbackIndex}`;
-    }
-
-    // اتصال بالبروكسي المحلي المشتغل بالخلفية
-    async function fetchViaProxy(targetUrl) {
-      const safeUrl = cleanUrl(targetUrl);
-      const proxyEndpoint = `http://127.0.0.1:8080/?url=${encodeURIComponent(safeUrl)}`;
-
-      try {
-        const res = await fetch(proxyEndpoint, { cache: "no-store" });
-        if (res.ok) {
-          const html = await res.text();
-          if (html && html.length > 200 && !html.includes("Error fetching site")) {
-            return new DOMParser().parseFromString(html, 'text/html');
-          }
-        }
-      } catch (e) {}
-
-      throw new Error("فشل الاتصال بالبروكسي بالخلفية.");
     }
 
     // ============================================================
@@ -162,14 +144,9 @@
     }
 
     function extractGenres(mDoc) {
-      // نجمع من كل السيلكتورات المحتملة حتى ما يفوتنا تصنيف
       const selectors = [
-        '.genres-content a',
-        '.summary-content .genres a',
-        '.genres a',
-        'a[href*="/genre/"]',
-        'a[href*="/genres/"]',
-        '.tags-content a',
+        '.genres-content a', '.summary-content .genres a', '.genres a',
+        'a[href*="/genre/"]', 'a[href*="/genres/"]', '.tags-content a',
       ];
       const set = new Set();
       selectors.forEach(sel => {
@@ -181,9 +158,7 @@
       return [...set];
     }
 
-    // ============================================================
     // معالجة فصل وحد: يكتشف صور (مانهوا) أو نص (رواية) وياخذ المناسب
-    // ============================================================
     async function extractChapterContent(chDoc) {
       const imgElements = Array.from(chDoc.querySelectorAll('img'));
       const rawImgs = imgElements
@@ -197,28 +172,40 @@
         return { isNovel: false, images: validImgs, content: '' };
       }
 
-      // ماكو صور كافية — على الأغلب رواية نصية. نجمع النص من الحاويات المعروفة
+      // ماكو صور — على الأغلب رواية نصية، نجمع النص من الحاويات المعروفة
       const textSelectors = [
         'div.text-right', 'div.entry-content p', 'div#novel-content',
-        'div.reading-content p', '.text-left', '.chapter-content p',
-        '#readerarea p',
+        'div.reading-content p', '.text-left', '.chapter-content p', '#readerarea p',
       ];
       let paragraphs = [];
       for (const sel of textSelectors) {
         const found = chDoc.querySelectorAll(sel);
         if (found.length) {
-          found.forEach(p => {
-            const t = p.textContent.trim();
-            if (t) paragraphs.push(t);
-          });
+          found.forEach(p => { const t = p.textContent.trim(); if (t) paragraphs.push(t); });
           if (paragraphs.length) break;
         }
       }
       const content = paragraphs.join('\n\n').trim();
-      if (content.length > 50) {
-        return { isNovel: true, images: [], content };
-      }
+      if (content.length > 50) return { isNovel: true, images: [], content };
       return { isNovel: false, images: [], content: '' };
+    }
+
+    // اتصال بالبروكسي المحلي المشتغل بالخلفية
+    async function fetchViaProxy(targetUrl) {
+      const safeUrl = cleanUrl(targetUrl);
+      const proxyEndpoint = `http://127.0.0.1:8080/?url=${encodeURIComponent(safeUrl)}`;
+
+      try {
+        const res = await fetch(proxyEndpoint, { cache: "no-store" });
+        if (res.ok) {
+          const html = await res.text();
+          if (html && html.length > 200 && !html.includes("Error fetching site")) {
+            return new DOMParser().parseFromString(html, 'text/html');
+          }
+        }
+      } catch (e) {}
+
+      throw new Error("فشل الاتصال بالبروكسي بالخلفية.");
     }
 
     // معالجة عمل فردي - مع شرط التجاوز إذا كان موجود بقاعدة البيانات
@@ -276,6 +263,7 @@
         });
 
         for (let j = 0; j < uniqueChaps.length; j++) {
+          if (!RUNNING) break; // احترام زر الإيقاف
           const ch = uniqueChaps[j];
           const chapterTitle = cleanChapterTitle(ch.txt, j + 1);
           try {
@@ -293,21 +281,27 @@
               });
 
               chapCount++;
-              if (isNovel) novelChapCount++;
+              if (isNovel) { novelChapCount++; document.getElementById('statNovels').innerText = novelChapCount; }
               imgCount += images.length;
               document.getElementById('statChaps').innerText = chapCount;
               document.getElementById('statImgs').innerText = imgCount;
-              document.getElementById('statNovels').innerText = novelChapCount;
+            } else {
+              markFailed(`فصل بدون محتوى: ${ch.url}`);
             }
 
-          } catch (chErr) {}
+          } catch (chErr) {
+            markFailed(`فصل: ${ch.url}`);
+          }
         }
-      } catch (err) {}
+      } catch (err) {
+        markFailed(`عمل: ${mUrl}`);
+      }
     }
 
     // توزيع 25 عامل بالتوازي
     async function processBatchInParallel(mangaUrls) {
       for (let i = 0; i < mangaUrls.length; i += CONCURRENCY_LIMIT) {
+        if (!RUNNING) break; // احترام زر الإيقاف
         const batch = mangaUrls.slice(i, i + CONCURRENCY_LIMIT);
         printLog(`\n⚡ 25 عامل يفحصون ويرفعون (${batch.length}) عمل بالتوازي...`);
         await Promise.all(batch.map(url => processSingleManga(url)));
@@ -316,14 +310,20 @@
 
     // سحب صفحات الأرشيف الشامل فقط
     async function startArchiveScraping() {
+      RUNNING = true;
       document.getElementById('startBtn').disabled = true;
       document.getElementById('fixBtn').disabled = true;
+      document.getElementById('stopBtn').disabled = false;
       document.getElementById('status').innerText = "🚀 السحب بالخلفية قيد التشغيل (25 عامل)...";
       await requestWakeLock();
 
       printLog("📁 بدء مسح الأرشيف الشامل: https://azorafly.com/series/");
 
       for (let p = 1; p <= 500; p++) {
+        if (!RUNNING) {
+          printLog(`  ⛔ تم الإيقاف يدوياً عند الصفحة ${p}.`);
+          break;
+        }
         const pageUrl = `https://azorafly.com/series/?page=${p}`;
         try {
           const pDoc = await fetchViaProxy(pageUrl);
@@ -342,31 +342,35 @@
           await processBatchInParallel(mangaList);
 
         } catch (pErr) {
+          markFailed(`صفحة أرشيف رقم ${p}`);
           printLog(`  ⚠️ إعادة المحاولة أو تخطي الصفحة ${p}...`);
         }
       }
 
-      document.getElementById('status').innerText = "🎉 اكتمل المسح والسحب الشامل بنجاح!";
+      document.getElementById('status').innerText = RUNNING
+        ? "🎉 اكتمل المسح والسحب الشامل بنجاح!"
+        : "⛔ تم إيقاف السحب يدوياً.";
+      RUNNING = false;
       document.getElementById('startBtn').disabled = false;
       document.getElementById('fixBtn').disabled = false;
+      document.getElementById('stopBtn').disabled = true;
     }
 
     // ============================================================
     // زر "تعديل": يحذف التكرار، يبقي وحدة بس، ويصلح الناقص
-    // (قصة، تقييم، تصنيفات، عناوين فصول نظيفة، فصول ناقصة)
     // ============================================================
     async function runFixSystem() {
+      RUNNING = true;
       document.getElementById('startBtn').disabled = true;
       document.getElementById('fixBtn').disabled = true;
+      document.getElementById('stopBtn').disabled = false;
       document.getElementById('status').innerText = "🛠️ التعديل شغال: حذف التكرار وإصلاح الناقص...";
       printLog("\n🛠️ بدء نظام التعديل...");
 
-      // 1) اقرأ كل الأعمال
       const allSnap = await getDocs(collection(db, "manga"));
       const items = allSnap.docs.map(d => ({ id: d.id, data: d.data() }));
       printLog(`📄 وجدت ${items.length} عمل بقاعدة البيانات.`);
 
-      // 2) جمّع حسب العنوان بعد التطبيع
       const groups = new Map();
       for (const it of items) {
         const key = normalizeTitle(it.data.title) || normalizeTitle(it.data.sourceUrl);
@@ -375,9 +379,9 @@
         groups.get(key).push(it);
       }
 
-      // 3) لكل مجموعة فيها تكرار: احسب عدد فصول كل نسخة، أبقِ الأكمل، احذف الباقي
       const survivors = [];
       for (const [key, group] of groups) {
+        if (!RUNNING) { printLog('  ⛔ تم الإيقاف أثناء فحص التكرار.'); break; }
         if (group.length === 1) { survivors.push(group[0]); continue; }
 
         printLog(`  🔍 "${group[0].data.title}" — ${group.length} نسخة مكررة، جاري الفحص...`);
@@ -404,8 +408,8 @@
 
       printLog(`✅ التكرار انتهى — أعمال متبقية: ${survivors.length}`);
 
-      // 4) لكل عمل ناجي منه، تأكد المعلومات كاملة وصلّح الناقص
       for (const it of survivors) {
+        if (!RUNNING) { printLog('  ⛔ تم الإيقاف أثناء الإصلاح.'); break; }
         if (!it.data.sourceUrl) continue;
 
         const needsFix = !it.data.description || it.data.rating === undefined || it.data.rating === null ||
@@ -427,7 +431,6 @@
             if (!it.data.titleNormalized) updates.titleNormalized = normalizeTitle(it.data.title);
           }
 
-          // 5) صلّح عناوين الفصول الموجودة (تبقي رقم بس) وأضف الناقصة
           const chapsSnap = await getDocs(collection(db, `manga/${it.id}/chapters`));
           const existingUrls = new Set();
           let titlesFixed = 0;
@@ -443,8 +446,13 @@
           }
           if (titlesFixed > 0) printLog(`    🔤 صلّحت ${titlesFixed} عنوان فصل بـ "${it.data.title}"`);
 
-          // فصول جديدة غير موجودة بقاعدة البيانات
           if (!mDoc) mDoc = await fetchViaProxy(it.data.sourceUrl);
           const chAnchors = Array.from(mDoc.querySelectorAll('a'))
             .map(a => ({ url: cleanUrl(a.href || a.getAttribute('href')), txt: a.innerText.trim() }))
             .filter(c => c.url && (c.url.includes('chapter') || c.url.includes('/ch-') || c.txt.includes('فصل')));
+          const uniqueChaps = [];
+          chAnchors.forEach(c => { if (!uniqueChaps.some(x => x.url === c.url)) uniqueChaps.push(c); });
+
+          const newChaps = uniqueChaps.filter(c => !existingUrls.has(c.url));
+          for (let j = 0; j < newChaps.length; j++) {
+     
