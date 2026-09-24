@@ -226,6 +226,16 @@
         // 2. إذا غير موجود، البدء بجلب وتخزين العمل الجديد
         const mDoc = await fetchViaProxy(mUrl);
         const title = mDoc.querySelector('meta[property="og:title"]')?.content || mDoc.title || "عمل أزورا";
+        const titleNorm = normalizeTitle(title);
+
+        // فحص إضافي: نفس العنوان بالضبط بس برابط مختلف شوي (مع/بدون / بالنهاية مثلاً)
+        const qTitle = query(collection(db, "manga"), where("titleNormalized", "==", titleNorm));
+        const titleSnap = await getDocs(qTitle);
+        if (!titleSnap.empty) {
+          printLog(`  ⏭️ [نفس العنوان موجود برابط مختلف - تم التجاوز]: ${title}`);
+          return;
+        }
+
         const cover = cleanUrl(mDoc.querySelector('meta[property="og:image"]')?.content || "");
         const description = extractDescription(mDoc);
         const rating = extractRating(mDoc);
@@ -233,7 +243,7 @@
 
         const docRef = await addDoc(collection(db, "manga"), {
           title: title,
-          titleNormalized: normalizeTitle(title),
+          titleNormalized: titleNorm,
           cover: cover,
           coverUrl: cover,
           image: cover,
@@ -319,12 +329,18 @@
 
       printLog("📁 بدء مسح الأرشيف الشامل: https://azorafly.com/series/");
 
-      for (let p = 1; p <= 500; p++) {
-        if (!RUNNING) {
-          printLog(`  ⛔ تم الإيقاف يدوياً عند الصفحة ${p}.`);
+      let pageUrl = "https://azorafly.com/series/";
+      const seenPages = new Set();
+      let pageNum = 0;
+
+      while (RUNNING && pageNum < 500) {
+        pageNum++;
+        if (!pageUrl || seenPages.has(pageUrl)) {
+          printLog(`  🏁 اكتمل سحب كافة صفحات الأرشيف.`);
           break;
         }
-        const pageUrl = `https://azorafly.com/series/?page=${p}`;
+        seenPages.add(pageUrl);
+
         try {
           const pDoc = await fetchViaProxy(pageUrl);
           const links = Array.from(pDoc.querySelectorAll('a'))
@@ -334,16 +350,21 @@
           const mangaList = [...new Set(links)].filter(url => !processedUrls.has(url));
 
           if (mangaList.length === 0) {
-            printLog(`  🏁 اكتمل سحب كافة صفحات الأرشيف عند الصفحة ${p - 1}.`);
+            printLog(`  🏁 اكتمل سحب كافة صفحات الأرشيف عند الصفحة ${pageNum - 1}.`);
             break;
           }
 
-          printLog(`  📑 الصفحة ${p}: عثرنا على ${mangaList.length} عمل.`);
+          printLog(`  📑 الصفحة ${pageNum}: عثرنا على ${mangaList.length} عمل.`);
           await processBatchInParallel(mangaList);
 
+          // يتبع رابط "الصفحة التالية" الفعلي من الموقع نفسه — بدون تخمين شكل الرابط
+          const nextEl = pDoc.querySelector('a.next.page-numbers, .nav-previous a, a[rel="next"]');
+          pageUrl = nextEl ? cleanUrl(nextEl.getAttribute('href') || nextEl.href) : null;
+
         } catch (pErr) {
-          markFailed(`صفحة أرشيف رقم ${p}`);
-          printLog(`  ⚠️ إعادة المحاولة أو تخطي الصفحة ${p}...`);
+          markFailed(`صفحة أرشيف رقم ${pageNum}`);
+          printLog(`  ⚠️ إعادة المحاولة أو تخطي الصفحة ${pageNum}...`);
+          break; // ما نكدر نعرف "الصفحة الجاية" لو فشلت هذي، نوقف بدل ما نلف بلا فايدة
         }
       }
 
@@ -455,4 +476,65 @@
 
           const newChaps = uniqueChaps.filter(c => !existingUrls.has(c.url));
           for (let j = 0; j < newChaps.length; j++) {
-     
+            if (!RUNNING) break;
+            const ch = newChaps[j];
+            const chapterTitle = cleanChapterTitle(ch.txt, chapsSnap.size + j + 1);
+            try {
+              const chDocPage = await fetchViaProxy(ch.url);
+              const { isNovel, images, content } = await extractChapterContent(chDocPage);
+              if (images.length > 0 || content.length > 0) {
+                await addDoc(collection(db, `manga/${it.id}/chapters`), {
+                  title: chapterTitle,
+                  sourceUrl: ch.url,
+                  isNovel, images, content,
+                  order: chapsSnap.size + j + 1
+                });
+                chapCount++;
+                if (isNovel) { novelChapCount++; document.getElementById('statNovels').innerText = novelChapCount; }
+                document.getElementById('statChaps').innerText = chapCount;
+              }
+            } catch (e) { markFailed(`فصل جديد أثناء التعديل: ${ch.url}`); }
+          }
+          if (newChaps.length > 0) printLog(`    ➕ أضفت ${newChaps.length} فصل جديد لـ "${it.data.title}"`);
+
+          if (Object.keys(updates).length > 0) {
+            updates.updatedAt = serverTimestamp();
+            await updateDoc(doc(db, "manga", it.id), updates);
+            fixedCount++;
+            document.getElementById('statFixed').innerText = fixedCount;
+            printLog(`  ✅ أصلحت "${it.data.title}" (${Object.keys(updates).length} حقل)`);
+          }
+        } catch (e) {
+          markFailed(`إصلاح "${it.data.title}"`);
+        }
+      }
+
+      document.getElementById('status').innerText = RUNNING
+        ? `🎉 التعديل خلص — حذف ${dupeCount} مكرر، أصلح ${fixedCount} عمل.`
+        : "⛔ تم إيقاف التعديل يدوياً.";
+      printLog(`\n🎉 التعديل خلص.`);
+      RUNNING = false;
+      document.getElementById('startBtn').disabled = false;
+      document.getElementById('fixBtn').disabled = false;
+      document.getElementById('stopBtn').disabled = true;
+    }
+
+    function stopCurrentProcess() {
+      RUNNING = false;
+      document.getElementById('status').innerText = "⏳ جاري الإيقاف... (يخلص الشغل الحالي أول)";
+      document.getElementById('stopBtn').disabled = true;
+    }
+
+    document.getElementById('startBtn').addEventListener('click', startArchiveScraping);
+    document.getElementById('stopBtn').addEventListener('click', stopCurrentProcess);
+    document.getElementById('fixBtn').addEventListener('click', () => {
+      runFixSystem().catch(e => {
+        printLog(`❌ خطأ عام بنظام التعديل: ${e.message}`);
+        document.getElementById('startBtn').disabled = false;
+        document.getElementById('fixBtn').disabled = false;
+        document.getElementById('stopBtn').disabled = true;
+      });
+    });
+  </script>
+</body>
+</html>
