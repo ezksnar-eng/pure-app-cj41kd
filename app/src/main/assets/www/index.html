@@ -1,512 +1,456 @@
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>تطبيق مانهوا ازورا — سحب ومزامنة</title>
-<style>
-  :root{
-    --bg:#0f1115; --panel:#171a21; --border:#2a2f3a; --text:#e6e8ec;
-    --muted:#8a8f9a; --accent:#4f8cff; --ok:#3ecf8e; --err:#ff5d5d; --warn:#f5a524;
-  }
-  *{box-sizing:border-box}
-  body{
-    margin:0; background:var(--bg); color:var(--text);
-    font-family:system-ui,-apple-system,"Segoe UI",sans-serif;
-    padding:20px;
-  }
-  h1{font-size:18px; margin:0 0 4px}
-  p.sub{color:var(--muted); margin:0 0 20px; font-size:13px}
-  .panel{
-    background:var(--panel); border:1px solid var(--border);
-    border-radius:10px; padding:16px; margin-bottom:14px;
-  }
-  label{display:block; font-size:12px; color:var(--muted); margin-bottom:4px}
-  input{
-    width:100%; padding:8px 10px; border-radius:6px; border:1px solid var(--border);
-    background:#0d0f14; color:var(--text); font-size:13px; margin-bottom:10px;
-  }
-  .row{display:flex; gap:10px; flex-wrap:wrap}
-  .row > div{flex:1; min-width:160px}
-  button{
-    background:var(--accent); color:#fff; border:none; padding:10px 18px;
-    border-radius:6px; font-size:13px; cursor:pointer; margin:4px 6px 4px 0;
-  }
-  button:disabled{opacity:.5; cursor:not-allowed}
-  button.secondary{background:#2a2f3a}
-  details{margin-top:6px}
-  summary{color:var(--muted); font-size:12px; cursor:pointer; margin-bottom:8px}
-  .stats{display:flex; gap:12px; flex-wrap:wrap; margin:12px 0}
-  .stat{background:#0d0f14; border:1px solid var(--border); border-radius:8px; padding:10px 14px; min-width:100px}
-  .stat b{display:block; font-size:20px}
-  .stat span{color:var(--muted); font-size:11px}
-  #log{
-    height:300px; overflow-y:auto; background:#0d0f14; border:1px solid var(--border);
-    border-radius:8px; padding:10px; font-size:12px; font-family:monospace; line-height:1.7;
-  }
-  .ok{color:var(--ok)} .err{color:var(--err)} .muted{color:var(--muted)} .warn{color:var(--warn)}
-</style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ساحب أزورا - سحب الأرشيف بالخلفية (25 عامل) ⚡</title>
+  <style>
+    :root { --main: #ff9800; --bg: #0b0b0e; --card: #16161a; --border: #26262e; --ok:#4caf50; }
+    body { font-family: system-ui, -apple-system, sans-serif; background: var(--bg); color: #fff; padding: 15px; margin: 0; }
+    .container { background: var(--card); padding: 20px; border-radius: 18px; max-width: 650px; margin: auto; border: 1px solid var(--border); box-shadow: 0 10px 30px rgba(0,0,0,0.9); }
+    h2 { color: var(--main); text-align: center; margin: 0 0 10px; font-size: 22px; }
+    .status-badge { display: block; text-align: center; padding: 8px 15px; border-radius: 12px; font-size: 13px; font-weight: bold; background: #1f1a0e; color: var(--main); border: 1px solid var(--main); margin-bottom: 15px; }
+    .grid-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 15px; }
+    .stat-card { background: #0e0e11; padding: 12px; border-radius: 10px; text-align: center; border: 1px solid var(--border); }
+    .stat-card h3 { margin: 0; color: var(--main); font-size: 20px; }
+    .stat-card p { margin: 3px 0 0; font-size: 11px; color: #888; }
+    #logBox { font-size: 12px; color: #64b5f6; white-space: pre-line; text-align: right; background: #060608; padding: 12px; border-radius: 10px; height: 380px; overflow-y: auto; border: 1px solid var(--border); font-family: monospace; line-height: 1.6; }
+    .controls { display: flex; gap: 10px; margin-bottom: 10px; }
+    .btn { flex: 1; padding: 12px; border-radius: 10px; border: none; font-weight: bold; cursor: pointer; background: var(--main); color: #000; font-size: 15px; }
+    .btn.fix { background: var(--ok); }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  </style>
 </head>
 <body>
 
-<h1>📚 تطبيق مانهوا ازورا</h1>
-<p class="sub">سحب كامل (اسم، غلاف، تقييم، قصة، تصنيفات، فصول وصفحات) + مزامنة بدون تكرار + إصلاح الناقص تلقائياً — ملف واحد فقط، بدون سيرفر منفصل.</p>
+  <div class="container">
+    <h2>ساحب أزورا (الخلفية + مطابقة قاعدة البيانات) ⚡</h2>
+    <div class="status-badge" id="status">⚡ البروكسي والخدمة بالخلفية جاهزة...</div>
 
-<div id="selfTestBanner" style="background:#1a2e1a; border:1px solid var(--ok); color:var(--ok); padding:10px 14px; border-radius:8px; margin-bottom:14px; font-size:13px;">
-  ⏳ يفحص نفسه...
-</div>
+    <div class="controls">
+      <button class="btn" id="startBtn">🚀 بدء سحب الأرشيف الشامل (25 عامل)</button>
+    </div>
+    <div class="controls">
+      <button class="btn fix" id="fixBtn">🛠️ تعديل (حذف التكرار + إصلاح الناقص)</button>
+    </div>
 
-<div class="panel">
-  <div class="row">
-    <div>
-      <label>Firebase Web API Key (من Project Settings — ليس الملف الخاص)</label>
-      <input id="apiKey" value="AIzaSyBkaDrsjial5W6xyXPPt1-trJhR7E9n2p4">
+    <div class="grid-stats">
+      <div class="stat-card"><h3 id="statManga">0</h3><p>أعمال جديدة</p></div>
+      <div class="stat-card"><h3 id="statChaps">0</h3><p>فصول معالجة</p></div>
+      <div class="stat-card"><h3 id="statImgs">0</h3><p>صور مرفوعة</p></div>
     </div>
-    <div>
-      <label>Project ID</label>
-      <input id="projectId" value="pure-library-2d45d">
+    <div class="grid-stats">
+      <div class="stat-card"><h3 id="statDupes">0</h3><p>مكررات محذوفة</p></div>
+      <div class="stat-card"><h3 id="statFixed">0</h3><p>أعمال تم إصلاحها</p></div>
+      <div class="stat-card"><h3 id="statNovels">0</h3><p>فصول روايات (نص)</p></div>
     </div>
-  </div>
-  <div class="row">
-    <div>
-      <label>رابط أرشيف السلاسل</label>
-      <input id="seriesUrl" value="https://azorafly.com/series/">
-    </div>
-    <div>
-      <label>عدد الكائنات (Workers)</label>
-      <input id="workerCount" value="616" type="number">
-    </div>
-  </div>
-  <div class="row">
-    <div>
-      <label>أقصى صفحات أرشيف</label>
-      <input id="maxPages" value="50" type="number">
-    </div>
-    <div>
-      <label>اسم المجموعة بقاعدة البيانات</label>
-      <input id="collectionName" value="مانغا">
-    </div>
+
+    <div id="logBox">اضغط بدء لتشغيل الـ 25 عامل بالخلفية، أو "تعديل" لتنظيف قاعدة البيانات الحالية...</div>
   </div>
 
-  <details>
-    <summary>⚙️ إعدادات متقدمة (اختياري — اتركها فاضية إذا مو متأكد)</summary>
-    <label>رابط بروكسي خاص بيك (proxy.py مستضاف على سيرفر) — إذا فاضي، التطبيق يجرب طرق مجانية بديلة تلقائياً</label>
-    <input id="customProxy" placeholder="مثال: https://myproxy.onrender.com/fetch">
-  </details>
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import {
+      getFirestore, collection, addDoc, doc, updateDoc, deleteDoc,
+      query, where, getDocs, getDoc, serverTimestamp
+    } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-  <div style="margin-top:10px">
-    <button onclick="testButtons()">🧪 اختبار: هل الأزرار تشتغل؟</button>
-    <button id="startBtn" onclick="safeCall(startRun)">🚀 ابدأ السحب والمزامنة</button>
-    <button class="secondary" onclick="safeCall(purgeDuplicates)">🧹 حذف التكرار</button>
-    <button class="secondary" onclick="safeCall(stopRun)">⛔ إيقاف</button>
-    <button class="secondary" onclick="safeCall(testFetch)">🔌 اختبار الوصول للموقع</button>
-  </div>
-</div>
+    const firebaseConfig = {
+      apiKey: "AIzaSyBkaDrsjial5W6xyXPPt1-trJhR7E9n2p4",
+      authDomain: "pure-library-2d45d.firebaseapp.com",
+      projectId: "pure-library-2d45d",
+      storageBucket: "pure-library-2d45d.firebasestorage.app",
+      messagingSenderId: "953898341477",
+      appId: "1:953898341477:web:85409f5597f894ff13e28c"
+    };
 
-<div class="stats">
-  <div class="stat"><b id="stNew">0</b><span>مانهوا جديدة</span></div>
-  <div class="stat"><b id="stRepaired">0</b><span>تم إصلاحها</span></div>
-  <div class="stat"><b id="stComplete">0</b><span>مكتملة مسبقاً</span></div>
-  <div class="stat"><b id="stChapters">0</b><span>فصل تمت مزامنته</span></div>
-  <div class="stat"><b id="stFailed">0</b><span>فشل</span></div>
-  <div class="stat"><b id="stActive">0</b><span>كائن نشط الآن</span></div>
-</div>
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
 
-<div class="panel">
-  <div id="log"></div>
-</div>
+    let mangaCount = 0, chapCount = 0, imgCount = 0, dupeCount = 0, fixedCount = 0, novelChapCount = 0;
+    const processedUrls = new Set();
+    const CONCURRENCY_LIMIT = 25; // 25 عامل موازي
 
-<script>
-// ============================================================
-// شبكة أمان: أي خطأ بأي زر لازم يبين للمستخدم، ما يضل صامت أبداً
-// ============================================================
-function safeCall(fn) {
-  try {
-    const result = fn();
-    if (result && typeof result.catch === 'function') {
-      result.catch(e => {
-        alert('صار خطأ: ' + e.message);
-        console.error(e);
-      });
-    }
-  } catch (e) {
-    alert('صار خطأ: ' + e.message);
-    console.error(e);
-  }
-}
-
-function testButtons() {
-  alert('✅ الأزرار تشتغل تمام. الوقت الحالي: ' + new Date().toLocaleTimeString('ar-IQ'));
-}
-
-window.addEventListener('load', () => {
-  const banner = document.getElementById('selfTestBanner');
-  try {
-    // فحص بسيط: هل fetch وDOMParser موجودين بهذا المتصفح/WebView؟
-    if (typeof fetch === 'undefined') throw new Error('fetch غير مدعوم بهذا المتصفح');
-    if (typeof DOMParser === 'undefined') throw new Error('DOMParser غير مدعوم بهذا المتصفح');
-    banner.textContent = '✅ الصفحة والكود شغالين تمام. اضغط "اختبار: هل الأزرار تشتغل؟" للتأكد، وبعدين "اختبار الوصول للموقع".';
-  } catch (e) {
-    banner.style.background = '#2e1a1a';
-    banner.style.borderColor = 'var(--err)';
-    banner.style.color = 'var(--err)';
-    banner.textContent = '❌ هذا المتصفح/الغلاف (WebView) ناقصه ميزات أساسية: ' + e.message + ' — جرب تفتح الملف بمتصفح Chrome عادي أول.';
-  }
-});
-
-// ============================================================
-// حالة عامة
-// ============================================================
-let RUNNING = false;
-let idToken = null;
-let existingTitleIndex = new Map(); // normalized title -> {id, data}
-
-const inProgress = new Set();
-const queue = [];
-const stats = { new: 0, repaired: 0, complete: 0, chapters: 0, failed: 0, active: 0 };
-
-// selectors تخص تصميم موقع azorafly.com — عدّلها إذا اختلف شكل الصفحات
-const SEL = {
-  listingCard: 'div.page-item-detail',
-  listingLink: 'h3.h5 a, .post-title a',
-  nextPage: 'a.next.page-numbers, .nav-previous a',
-  title: 'h1.entry-title, div.post-title h1',
-  score: '.score, .rating .score, span.total_votes',
-  cover: 'div.summary_image img, div.thumb img',
-  description: '.summary__content, .description-summary .summary__content',
-  genres: '.genres-content a, .summary-content .genres a',
-  status: '.summary-content .post-status .summary-content, .post-status div.summary-content',
-  chapterRow: 'li.wp-manga-chapter a, ul.main.version-chap li a',
-  pageImage: 'div.reader-area img, div#readerarea img, div.page-break img',
-};
-
-// ============================================================
-// جلب صفحات بدون سيرفر خاص — بروكسي مخصص إذا موجود، وإلا خدمات مجانية
-// ============================================================
-// ملاحظة صادقة: ماكو 30 خدمة "بروكسي" مجانية موثوقة فعلاً بنفس الوقت —
-// أغلب الخدمات المجانية تنغلق أو تنحظر بسرعة. هذا التنويع يزيد فرصة
-// النجاح، بس تذكر: هذا يحل مشكلة CORS بس (يعني "الموقع ما يسمح
-// للمتصفح يوصله مباشرة"). إذا الموقع نفسه يسوي فحص Cloudflare حقيقي
-// (صفحة "تحقق أنك مو روبوت")، ولا وحدة من هذوله تعديها — هذا يحتاج
-// سيرفر حقيقي (proxy.py) بس مو أكثر بروكسيات هنا.
-const PUBLIC_RELAYS = [
-  u => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
-  u => `https://corsproxy.io/?url=${encodeURIComponent(u)}`,
-  u => `https://thingproxy.freeboard.io/fetch/${u}`,
-  u => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(u)}`,
-  u => `https://cors.eu.org/${u}`,
-  u => `https://proxy.cors.sh/${u}`,
-];
-
-async function fetchTarget(targetUrl, retries = 2) {
-  const customProxy = document.getElementById('customProxy').value.trim();
-  const attempts = customProxy
-    ? [() => `${customProxy}?url=${encodeURIComponent(targetUrl)}`]
-    : PUBLIC_RELAYS;
-
-  for (let round = 0; round < retries; round++) {
-    for (const buildUrl of attempts) {
+    async function requestWakeLock() {
       try {
-        const res = await fetch(buildUrl(targetUrl), { headers: { 'Accept': 'text/html' } });
-        if (res.ok) {
-          const text = await res.text();
-          // لو رجعت صفحة تحقق Cloudflare بدل المحتوى الحقيقي
-          if (text.includes('Just a moment') || text.includes('cf-browser-verification')) {
-            log(`⚠️ الموقع رجّع صفحة تحقق Cloudflare بدل المحتوى — هذا يحتاج سيرفر بروكسي حقيقي (راجع الشرح فوق).`, 'warn');
-            return null;
-          }
-          if (text.length > 200) return text;
-        }
-      } catch (e) { /* جرب الطريقة الجاية */ }
+        if ('wakeLock' in navigator) await navigator.wakeLock.request('screen');
+      } catch (e) {}
     }
-    await new Promise(r => setTimeout(r, 1200));
-  }
-  return null;
-}
 
-async function testFetch() {
-  log('🔌 يفحص الوصول لـ azorafly.com...');
-  const html = await fetchTarget(document.getElementById('seriesUrl').value.trim());
-  if (html) {
-    log(`✅ نجح! وصل محتوى الصفحة (${html.length} حرف).`, 'ok');
-  } else {
-    log('❌ فشل الوصول — إما الموقع محمي بـ Cloudflare قوي، أو الخدمات المجانية محظورة مؤقتاً. جرب لاحقاً أو استخدم بروكسي خاص بحقل الإعدادات المتقدمة.', 'err');
-  }
-}
+    function printLog(txt) {
+      const b = document.getElementById('logBox');
+      b.innerText += "\n> " + txt;
+      b.scrollTop = b.scrollHeight;
+    }
 
-function parseHTML(html) {
-  return new DOMParser().parseFromString(html, 'text/html');
-}
+    function cleanUrl(url) {
+      if (!url) return "";
+      let cleaned = url.trim();
+      if (cleaned.includes('androidplatform.net')) {
+        cleaned = cleaned.replace(/https?:\/\/appassets\.androidplatform\.net/g, 'https://azorafly.com');
+      }
+      if (cleaned.startsWith("//")) return "https:" + cleaned;
+      if (cleaned.startsWith("/")) return "https://azorafly.com" + cleaned;
+      if (!cleaned.startsWith("http")) return "https://azorafly.com/" + cleaned;
+      return cleaned;
+    }
 
-function log(msg, cls) {
-  const el = document.getElementById('log');
-  const line = document.createElement('div');
-  if (cls) line.className = cls;
-  const t = new Date().toLocaleTimeString('ar-IQ');
-  line.textContent = `[${t}] ${msg}`;
-  el.appendChild(line);
-  el.scrollTop = el.scrollHeight;
-}
+    function normalizeTitle(t) {
+      if (!t) return "";
+      return t.normalize('NFKC').trim().toLowerCase().replace(/\s+/g, ' ');
+    }
 
-function renderStats() {
-  document.getElementById('stNew').textContent = stats.new;
-  document.getElementById('stRepaired').textContent = stats.repaired;
-  document.getElementById('stComplete').textContent = stats.complete;
-  document.getElementById('stChapters').textContent = stats.chapters;
-  document.getElementById('stFailed').textContent = stats.failed;
-  document.getElementById('stActive').textContent = stats.active;
-}
+    // ============================================================
+    // تنظيف اسم الفصل: يبقي رقم الفصل بس، يشيل أي كلمة زيادة
+    // (تاريخ نشر، "جديد"، إلخ)
+    // ============================================================
+    function cleanChapterTitle(rawText, fallbackIndex) {
+      const text = (rawText || '').trim();
+      const m = text.match(/(?:الفصل|فصل|chapter|ch\.?)\s*(\d+(?:\.\d+)?)/i);
+      if (m) return `الفصل ${m[1]}`;
+      // لو ماكو كلمة "فصل" بس اللقطة تبدأ برقم، خذ الرقم بس
+      const numOnly = text.match(/^(\d+(?:\.\d+)?)/);
+      if (numOnly) return `الفصل ${numOnly[1]}`;
+      return `الفصل ${fallbackIndex}`;
+    }
 
-// ============================================================
-// أدوات نصية
-// ============================================================
-function safeDocId(text) {
-  if (!text) return 'manga_doc';
-  let s = text.normalize('NFKC').trim().toLowerCase();
-  s = s.replace(/[^\w\u0600-\u06FF]+/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '');
-  return (s || 'manga_doc').slice(0, 150);
-}
-function normalizeText(t) {
-  if (!t) return '';
-  return String(t).normalize('NFKC').trim().toLowerCase().replace(/\s+/g, ' ');
-}
-function encodeFsPath(path) {
-  return path.split('/').map(encodeURIComponent).join('/');
-}
+    // اتصال بالبروكسي المحلي المشتغل بالخلفية
+    async function fetchViaProxy(targetUrl) {
+      const safeUrl = cleanUrl(targetUrl);
+      const proxyEndpoint = `http://127.0.0.1:8080/?url=${encodeURIComponent(safeUrl)}`;
 
-// ============================================================
-// Firebase Auth (مجهول) + Firestore REST
-// ============================================================
-async function ensureAuth() {
-  if (idToken) return idToken;
-  const apiKey = document.getElementById('apiKey').value.trim();
-  const res = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${apiKey}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ returnSecureToken: true }),
-  });
-  if (!res.ok) throw new Error('فشل تسجيل الدخول المجهول — تأكد من تفعيل Anonymous Auth و apiKey صحيح');
-  const data = await res.json();
-  idToken = data.idToken;
-  return idToken;
-}
+      try {
+        const res = await fetch(proxyEndpoint, { cache: "no-store" });
+        if (res.ok) {
+          const html = await res.text();
+          if (html && html.length > 200 && !html.includes("Error fetching site")) {
+            return new DOMParser().parseFromString(html, 'text/html');
+          }
+        }
+      } catch (e) {}
 
-function toFirestoreValue(v) {
-  if (v === null || v === undefined) return { nullValue: null };
-  if (typeof v === 'number') return Number.isInteger(v) ? { integerValue: String(v) } : { doubleValue: v };
-  if (typeof v === 'boolean') return { booleanValue: v };
-  if (Array.isArray(v)) return { arrayValue: { values: v.map(toFirestoreValue) } };
-  return { stringValue: String(v) };
-}
-function toFirestoreFields(obj) {
-  const fields = {};
-  for (const [k, val] of Object.entries(obj)) fields[k] = toFirestoreValue(val);
-  return { fields };
-}
-function fieldsToObj(doc) {
-  const out = {};
-  const fields = (doc && doc.fields) || {};
-  for (const [k, v] of Object.entries(fields)) {
-    if ('stringValue' in v) out[k] = v.stringValue;
-    else if ('integerValue' in v) out[k] = parseInt(v.integerValue, 10);
-    else if ('doubleValue' in v) out[k] = v.doubleValue;
-    else if ('booleanValue' in v) out[k] = v.booleanValue;
-    else if ('arrayValue' in v) out[k] = (v.arrayValue.values || []).map(x => x.stringValue ?? x.integerValue ?? '');
-  }
-  return out;
-}
+      throw new Error("فشل الاتصال بالبروكسي بالخلفية.");
+    }
 
-async function firestoreWrite(path, obj) {
-  const projectId = document.getElementById('projectId').value.trim();
-  const token = await ensureAuth();
-  const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/${encodeFsPath(path)}?updateMask.fieldPaths=` +
-              Object.keys(obj).map(encodeURIComponent).join('&updateMask.fieldPaths=');
-  const res = await fetch(url, {
-    method: 'PATCH',
-    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify(toFirestoreFields(obj)),
-  });
-  if (!res.ok) throw new Error(`Firestore write failed (${res.status}): ${await res.text()}`);
-  return res.json();
-}
+    // ============================================================
+    // استخراج شامل: القصة، التقييم، كل التصنيفات بدون ترك وحد
+    // ============================================================
+    function extractDescription(mDoc) {
+      const sel = '.summary__content, .description-summary .summary__content, div.manga-summary, #noticeContent p, .post-content_item .summary-content';
+      const el = mDoc.querySelector(sel);
+      return el ? el.textContent.trim() : '';
+    }
 
-async function firestoreListCollection(name) {
-  const projectId = document.getElementById('projectId').value.trim();
-  const token = await ensureAuth();
-  let docs = [];
-  let pageToken = null;
-  do {
-    const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/${encodeFsPath(name)}` +
-                `?pageSize=300${pageToken ? '&pageToken=' + pageToken : ''}`;
-    const res = await fetch(url, { headers: { 'Authorization': `Bearer ${token}` } });
-    if (!res.ok) throw new Error(`Firestore list failed (${res.status})`);
-    const data = await res.json();
-    docs = docs.concat(data.documents || []);
-    pageToken = data.nextPageToken || null;
-  } while (pageToken);
-  return docs;
-}
+    function extractRating(mDoc) {
+      const sel = '.post-total-rating .score, .rating .score, span.total_votes, .score';
+      const el = mDoc.querySelector(sel);
+      if (!el) return null;
+      const num = parseFloat(el.textContent.replace(',', '.').match(/[\d.]+/)?.[0]);
+      return isNaN(num) ? el.textContent.trim() : num;
+    }
 
-async function firestoreDelete(path) {
-  const projectId = document.getElementById('projectId').value.trim();
-  const token = await ensureAuth();
-  const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/${encodeFsPath(path)}`;
-  await fetch(url, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
-}
+    function extractGenres(mDoc) {
+      // نجمع من كل السيلكتورات المحتملة حتى ما يفوتنا تصنيف
+      const selectors = [
+        '.genres-content a',
+        '.summary-content .genres a',
+        '.genres a',
+        'a[href*="/genre/"]',
+        'a[href*="/genres/"]',
+        '.tags-content a',
+      ];
+      const set = new Set();
+      selectors.forEach(sel => {
+        mDoc.querySelectorAll(sel).forEach(a => {
+          const t = a.textContent.trim();
+          if (t) set.add(t);
+        });
+      });
+      return [...set];
+    }
 
-// ============================================================
-// بناء فهرس العناوين الموجودة بقاعدة البيانات (مرة وحدة بأول تشغيل)
-// حتى نلكم السلاسل القديمة اللي عندها IDs عشوائية، مو بس الجديدة
-// ============================================================
-async function buildTitleIndex() {
-  const collectionName = document.getElementById('collectionName').value.trim();
-  log('📇 يبني فهرس العناوين الموجودة بقاعدة البيانات...');
-  let docs = [];
-  try {
-    docs = await firestoreListCollection(collectionName);
-  } catch (e) {
-    log(`⚠️ ما كدرت أقرا المجموعة (ربما فاضية لسه): ${e.message}`, 'warn');
-  }
-  existingTitleIndex.clear();
-  for (const d of docs) {
-    const id = d.name.split('/').pop();
-    const data = fieldsToObj(d);
-    const key = normalizeText(data['عنوان']);
-    if (key) existingTitleIndex.set(key, { id, data });
-  }
-  log(`📇 الفهرس جاهز: ${existingTitleIndex.size} مانهوا موجودة مسبقاً.`);
-}
+    // ============================================================
+    // معالجة فصل وحد: يكتشف صور (مانهوا) أو نص (رواية) وياخذ المناسب
+    // ============================================================
+    async function extractChapterContent(chDoc) {
+      const imgElements = Array.from(chDoc.querySelectorAll('img'));
+      const rawImgs = imgElements
+        .map(img => img.getAttribute('data-src') || img.getAttribute('lazy-src') || img.src)
+        .filter(Boolean);
+      const validImgs = [...new Set(rawImgs)]
+        .map(cleanUrl)
+        .filter(src => src && (src.includes('.jpg') || src.includes('.png') || src.includes('.webp') || src.includes('uploads')));
 
-// ============================================================
-// اكتشاف روابط السلاسل عبر الصفحات (pagination)
-// ============================================================
-async function discoverSeriesLinks() {
-  const startUrl = document.getElementById('seriesUrl').value.trim();
-  const maxPages = parseInt(document.getElementById('maxPages').value, 10) || 50;
-  const links = new Set();
-  let url = startUrl;
-  const seenPages = new Set();
+      if (validImgs.length > 0) {
+        return { isNovel: false, images: validImgs, content: '' };
+      }
 
-  for (let i = 0; i < maxPages && RUNNING; i++) {
-    if (!url || seenPages.has(url)) break;
-    seenPages.add(url);
+      // ماكو صور كافية — على الأغلب رواية نصية. نجمع النص من الحاويات المعروفة
+      const textSelectors = [
+        'div.text-right', 'div.entry-content p', 'div#novel-content',
+        'div.reading-content p', '.text-left', '.chapter-content p',
+        '#readerarea p',
+      ];
+      let paragraphs = [];
+      for (const sel of textSelectors) {
+        const found = chDoc.querySelectorAll(sel);
+        if (found.length) {
+          found.forEach(p => {
+            const t = p.textContent.trim();
+            if (t) paragraphs.push(t);
+          });
+          if (paragraphs.length) break;
+        }
+      }
+      const content = paragraphs.join('\n\n').trim();
+      if (content.length > 50) {
+        return { isNovel: true, images: [], content };
+      }
+      return { isNovel: false, images: [], content: '' };
+    }
 
-    const html = await fetchTarget(url);
-    if (!html) { log(`فشل جلب صفحة الأرشيف: ${url}`, 'err'); break; }
+    // معالجة عمل فردي - مع شرط التجاوز إذا كان موجود بقاعدة البيانات
+    async function processSingleManga(mUrl) {
+      if (processedUrls.has(mUrl)) return;
+      processedUrls.add(mUrl);
 
-    const doc = parseHTML(html);
-    doc.querySelectorAll(SEL.listingCard).forEach(card => {
-      const a = card.querySelector(SEL.listingLink);
-      if (a && a.href) links.add(a.href);
-    });
+      try {
+        // 1. فحص قاعدة البيانات أولاً
+        const q = query(collection(db, "manga"), where("sourceUrl", "==", mUrl));
+        const snap = await getDocs(q);
 
-    log(`📄 صفحة ${i + 1}: ${links.size} رابط تراكمي`);
-    const nextEl = doc.querySelector(SEL.nextPage);
-    url = nextEl ? nextEl.href : null;
-  }
-  return [...links];
-}
+        if (!snap.empty) {
+          printLog(`  ⏭️ [متواجد بقاعدة البيانات - تم التجاوز]: ${mUrl}`);
+          return; // الخروج المباشر وعدم إعادة سحبه أو رفعه
+        }
 
-// ============================================================
-// سحب مانهوا وحدة + كل فصولها وصفحاتها
-// ============================================================
-async function scrapeSeries(url) {
-  const html = await fetchTarget(url);
-  if (!html) return null;
+        // 2. إذا غير موجود، البدء بجلب وتخزين العمل الجديد
+        const mDoc = await fetchViaProxy(mUrl);
+        const title = mDoc.querySelector('meta[property="og:title"]')?.content || mDoc.title || "عمل أزورا";
+        const cover = cleanUrl(mDoc.querySelector('meta[property="og:image"]')?.content || "");
+        const description = extractDescription(mDoc);
+        const rating = extractRating(mDoc);
+        const genres = extractGenres(mDoc);
 
-  const doc = parseHTML(html);
-  const titleEl = doc.querySelector(SEL.title);
-  if (!titleEl) return null;
+        const docRef = await addDoc(collection(db, "manga"), {
+          title: title,
+          titleNormalized: normalizeTitle(title),
+          cover: cover,
+          coverUrl: cover,
+          image: cover,
+          description: description,
+          rating: rating,
+          genres: genres,
+          sourceUrl: mUrl,
+          sourceSite: "Azora",
+          type: "مانهوا",
+          status: "مستمر",
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp()
+        });
+        const mangaId = docRef.id;
+        mangaCount++;
+        document.getElementById('statManga').innerText = mangaCount;
+        printLog(`  ✨ [رفع جديد]: ${title} — تصنيفات: ${genres.length}`);
 
-  const title = titleEl.textContent.trim();
-  const scoreEl = doc.querySelector(SEL.score);
-  const coverEl = doc.querySelector(SEL.cover);
-  const descEl = doc.querySelector(SEL.description);
-  const genreEls = [...doc.querySelectorAll(SEL.genres)];
-  const chapterRows = [...doc.querySelectorAll(SEL.chapterRow)];
+        // 3. استخراج وفحص الفصول
+        const chAnchors = Array.from(mDoc.querySelectorAll('a'))
+          .map(a => ({ url: cleanUrl(a.href || a.getAttribute('href')), txt: a.innerText.trim() }))
+          .filter(c => c.url && (c.url.includes('chapter') || c.url.includes('/ch-') || c.txt.includes('فصل')));
 
-  const series = {
-    title,
-    source_url: url,
-    cover: coverEl ? (coverEl.getAttribute('data-src') || coverEl.src || '') : '',
-    score: scoreEl ? scoreEl.textContent.trim() : '',
-    description: descEl ? descEl.textContent.trim() : '',
-    genres: genreEls.map(g => g.textContent.trim()).filter(Boolean),
-    chapters: [],
-  };
+        const uniqueChaps = [];
+        chAnchors.forEach(c => {
+          if (!uniqueChaps.some(x => x.url === c.url)) uniqueChaps.push(c);
+        });
 
-  for (const row of chapterRows) {
-    const chTitle = row.textContent.trim() || 'Untitled';
-    const chUrl = row.href;
-    if (!chUrl) continue;
-    const pages = await scrapeChapterPages(chUrl);
-    series.chapters.push({ title: chTitle, url: chUrl, pages });
-  }
+        for (let j = 0; j < uniqueChaps.length; j++) {
+          const ch = uniqueChaps[j];
+          const chapterTitle = cleanChapterTitle(ch.txt, j + 1);
+          try {
+            const chDoc = await fetchViaProxy(ch.url);
+            const { isNovel, images, content } = await extractChapterContent(chDoc);
 
-  return series;
-}
+            if (images.length > 0 || content.length > 0) {
+              await addDoc(collection(db, `manga/${mangaId}/chapters`), {
+                title: chapterTitle,
+                sourceUrl: ch.url,
+                isNovel: isNovel,
+                images: images,
+                content: content,
+                order: j + 1
+              });
 
-async function scrapeChapterPages(chapterUrl) {
-  const html = await fetchTarget(chapterUrl);
-  if (!html) return [];
-  const doc = parseHTML(html);
-  const pages = [];
-  doc.querySelectorAll(SEL.pageImage).forEach(img => {
-    const src = img.getAttribute('data-src') || img.getAttribute('src');
-    if (src && src.trim()) pages.push(src.trim());
-  });
-  return pages;
-}
+              chapCount++;
+              if (isNovel) novelChapCount++;
+              imgCount += images.length;
+              document.getElementById('statChaps').innerText = chapCount;
+              document.getElementById('statImgs').innerText = imgCount;
+              document.getElementById('statNovels').innerText = novelChapCount;
+            }
 
-// ============================================================
-// رفع لـ Firestore مع نظام تحقق وإصلاح (verify & repair)
-// ============================================================
-async function upsertSeries(series) {
-  const collectionName = document.getElementById('collectionName').value.trim();
-  const key = normalizeText(series.title);
-  const existing = existingTitleIndex.get(key);
+          } catch (chErr) {}
+        }
+      } catch (err) {}
+    }
 
-  const docId = existing ? existing.id : safeDocId(series.title);
-  const docPath = `${collectionName}/${docId}`;
-
-  const desiredFields = {
-    'عنوان': series.title,
-    'غطاء': series.cover,
-    'قصة': series.description,
-    'تقييم': series.score,
-    'تصنيفات': series.genres,
-    'المصدر URL': series.source_url,
-    'موقع المصدر': 'أزورا',
-    'يكتب': 'مانهوا',
-    'عدد_الفصول': series.chapters.length,
-  };
-
-  let changedFields = {};
-  if (existing) {
-    for (const [k, v] of Object.entries(desiredFields)) {
-      const current = existing.data[k];
-      const isEmpty = current === undefined || current === null || current === '' ||
-                      (Array.isArray(current) && current.length === 0);
-      if (isEmpty && (Array.isArray(v) ? v.length > 0 : !!v)) {
-        changedFields[k] = v; // يملأ فراغ ناقص
-      } else if (k === 'عدد_الفصول' && current !== v) {
-        changedFields[k] = v; // يصحح عدد الفصول لو تغيّر
+    // توزيع 25 عامل بالتوازي
+    async function processBatchInParallel(mangaUrls) {
+      for (let i = 0; i < mangaUrls.length; i += CONCURRENCY_LIMIT) {
+        const batch = mangaUrls.slice(i, i + CONCURRENCY_LIMIT);
+        printLog(`\n⚡ 25 عامل يفحصون ويرفعون (${batch.length}) عمل بالتوازي...`);
+        await Promise.all(batch.map(url => processSingleManga(url)));
       }
     }
-  } else {
-    changedFields = desiredFields;
-  }
 
-  if (existing && Object.keys(changedFields).length === 0) {
-    stats.complete++;
-    log(`✅ مكتملة مسبقاً: ${series.title}`, 'muted');
-    renderStats();
-    return;
-  }
+    // سحب صفحات الأرشيف الشامل فقط
+    async function startArchiveScraping() {
+      document.getElementById('startBtn').disabled = true;
+      document.getElementById('fixBtn').disabled = true;
+      document.getElementById('status').innerText = "🚀 السحب بالخلفية قيد التشغيل (25 عامل)...";
+      await requestWakeLock();
 
-  changedFields['تم_التحديث'] = new Date().toISOString();
-  await firestoreWrite(docPath, changedFields);
+      printLog("📁 بدء مسح الأرشيف الشامل: https://azorafly.com/series/");
 
-  // مزامنة الفصول (upsert لكل فصل — ما يكرر الموجود)
-  for (const ch of series.chapters) {
-    const chId =
+      for (let p = 1; p <= 500; p++) {
+        const pageUrl = `https://azorafly.com/series/?page=${p}`;
+        try {
+          const pDoc = await fetchViaProxy(pageUrl);
+          const links = Array.from(pDoc.querySelectorAll('a'))
+            .map(a => cleanUrl(a.href || a.getAttribute('href')))
+            .filter(h => h && (h.includes('/series/') || h.includes('/manga/') || h.includes('/work/')) && !h.endsWith('/series/') && !h.includes('genres='));
+
+          const mangaList = [...new Set(links)].filter(url => !processedUrls.has(url));
+
+          if (mangaList.length === 0) {
+            printLog(`  🏁 اكتمل سحب كافة صفحات الأرشيف عند الصفحة ${p - 1}.`);
+            break;
+          }
+
+          printLog(`  📑 الصفحة ${p}: عثرنا على ${mangaList.length} عمل.`);
+          await processBatchInParallel(mangaList);
+
+        } catch (pErr) {
+          printLog(`  ⚠️ إعادة المحاولة أو تخطي الصفحة ${p}...`);
+        }
+      }
+
+      document.getElementById('status').innerText = "🎉 اكتمل المسح والسحب الشامل بنجاح!";
+      document.getElementById('startBtn').disabled = false;
+      document.getElementById('fixBtn').disabled = false;
+    }
+
+    // ============================================================
+    // زر "تعديل": يحذف التكرار، يبقي وحدة بس، ويصلح الناقص
+    // (قصة، تقييم، تصنيفات، عناوين فصول نظيفة، فصول ناقصة)
+    // ============================================================
+    async function runFixSystem() {
+      document.getElementById('startBtn').disabled = true;
+      document.getElementById('fixBtn').disabled = true;
+      document.getElementById('status').innerText = "🛠️ التعديل شغال: حذف التكرار وإصلاح الناقص...";
+      printLog("\n🛠️ بدء نظام التعديل...");
+
+      // 1) اقرأ كل الأعمال
+      const allSnap = await getDocs(collection(db, "manga"));
+      const items = allSnap.docs.map(d => ({ id: d.id, data: d.data() }));
+      printLog(`📄 وجدت ${items.length} عمل بقاعدة البيانات.`);
+
+      // 2) جمّع حسب العنوان بعد التطبيع
+      const groups = new Map();
+      for (const it of items) {
+        const key = normalizeTitle(it.data.title) || normalizeTitle(it.data.sourceUrl);
+        if (!key) continue;
+        if (!groups.has(key)) groups.set(key, []);
+        groups.get(key).push(it);
+      }
+
+      // 3) لكل مجموعة فيها تكرار: احسب عدد فصول كل نسخة، أبقِ الأكمل، احذف الباقي
+      const survivors = [];
+      for (const [key, group] of groups) {
+        if (group.length === 1) { survivors.push(group[0]); continue; }
+
+        printLog(`  🔍 "${group[0].data.title}" — ${group.length} نسخة مكررة، جاري الفحص...`);
+        for (const it of group) {
+          const chapsSnap = await getDocs(collection(db, `manga/${it.id}/chapters`));
+          it.chapCount = chapsSnap.size;
+        }
+        group.sort((a, b) => b.chapCount - a.chapCount);
+        const keep = group[0];
+        const dupes = group.slice(1);
+
+        for (const dupe of dupes) {
+          const chapsSnap = await getDocs(collection(db, `manga/${dupe.id}/chapters`));
+          for (const chDoc of chapsSnap.docs) {
+            await deleteDoc(doc(db, `manga/${dupe.id}/chapters`, chDoc.id));
+          }
+          await deleteDoc(doc(db, "manga", dupe.id));
+          dupeCount++;
+          document.getElementById('statDupes').innerText = dupeCount;
+          printLog(`    🗑️ حذف نسخة مكررة (${dupe.chapCount} فصل) — أبقيت النسخة صاحبة ${keep.chapCount} فصل`);
+        }
+        survivors.push(keep);
+      }
+
+      printLog(`✅ التكرار انتهى — أعمال متبقية: ${survivors.length}`);
+
+      // 4) لكل عمل ناجي منه، تأكد المعلومات كاملة وصلّح الناقص
+      for (const it of survivors) {
+        if (!it.data.sourceUrl) continue;
+
+        const needsFix = !it.data.description || it.data.rating === undefined || it.data.rating === null ||
+                          !it.data.genres || it.data.genres.length === 0 || !it.data.cover;
+
+        let mDoc = null;
+        const updates = {};
+
+        try {
+          if (needsFix) {
+            mDoc = await fetchViaProxy(it.data.sourceUrl);
+            if (!it.data.description) updates.description = extractDescription(mDoc);
+            if (it.data.rating === undefined || it.data.rating === null) updates.rating = extractRating(mDoc);
+            if (!it.data.genres || it.data.genres.length === 0) updates.genres = extractGenres(mDoc);
+            if (!it.data.cover) {
+              const cov = cleanUrl(mDoc.querySelector('meta[property="og:image"]')?.content || "");
+              if (cov) { updates.cover = cov; updates.coverUrl = cov; updates.image = cov; }
+            }
+            if (!it.data.titleNormalized) updates.titleNormalized = normalizeTitle(it.data.title);
+          }
+
+          // 5) صلّح عناوين الفصول الموجودة (تبقي رقم بس) وأضف الناقصة
+          const chapsSnap = await getDocs(collection(db, `manga/${it.id}/chapters`));
+          const existingUrls = new Set();
+          let titlesFixed = 0;
+
+          for (const chDoc of chapsSnap.docs) {
+            const chData = chDoc.data();
+            existingUrls.add(chData.sourceUrl);
+            const cleaned = cleanChapterTitle(chData.title, chData.order || 1);
+            if (cleaned !== chData.title) {
+              await updateDoc(doc(db, `manga/${it.id}/chapters`, chDoc.id), { title: cleaned });
+              titlesFixed++;
+            }
+          }
+          if (titlesFixed > 0) printLog(`    🔤 صلّحت ${titlesFixed} عنوان فصل بـ "${it.data.title}"`);
+
+          // فصول جديدة غير موجودة بقاعدة البيانات
+          if (!mDoc) mDoc = await fetchViaProxy(it.data.sourceUrl);
+          const chAnchors = Array.from(mDoc.querySelectorAll('a'))
+            .map(a => ({ url: cleanUrl(a.href || a.getAttribute('href')), txt: a.innerText.trim() }))
+            .filter(c => c.url && (c.url.includes('chapter') || c.url.includes('/ch-') || c.txt.includes('فصل')));
+          const uniqueChaps = [];
+          chAnchors.forEach(c => { if (!uniqueChaps.some(x => x.url === c.url)) uniqueChaps.push(c); });
+
+          const newChaps = uniqueChaps.filter(c => !existingUrls.has(c.url));
+          for (let j = 0; j < newChaps.length; j++) {
+            const ch = newChaps[j];
+            const chapterTitle = cleanChapterTitle(ch.txt, chapsSnap.size + j + 1);
+            try {
+              const chDocPage = await fetchViaProxy(ch.url);
+              const { isNovel, images, content } = await extractChapterContent(chDocPage);
+              if (images.length > 0 || content.length > 0) {
+                await addDoc(collection(db, `manga/${it.id}/chapters`), {
+                  title: chapterTitle,
+                  sourceUrl: ch.url,
+                  isNovel, images, content,
+                  order: chapsSnap.size + j + 1
+                });
+                chap
