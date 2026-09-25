@@ -307,8 +307,17 @@
     // ============================================================
     // استخراج البيانات — حسب ملف الموقع النشط (getActiveProfile)
     // ============================================================
+    function stripHtmlTags(s) {
+      if (!s) return '';
+      return s.replace(/<\/?[a-z][^>]*>/gi, ' ').replace(/\s+/g, ' ').trim();
+    }
     function extractDescription(mDoc) {
-      const el = mDoc.querySelector(getActiveProfile().description);
+      // مؤكد يشتغل: meta description / og:description (شفناها بالتشخيص)
+      const metaDesc = mDoc.querySelector('meta[property="og:description"]')?.content ||
+                        mDoc.querySelector('meta[name="description"]')?.content || '';
+      if (metaDesc) return stripHtmlTags(metaDesc);
+      // احتياط: لو الموقع النشط عنده سيلكتور مخصص بالجسم
+      const el = mDoc.querySelector(getActiveProfile().description || '');
       return el ? el.textContent.trim() : '';
     }
     function extractRating(mDoc) {
@@ -363,14 +372,14 @@
       'genre', 'تصنيف', 'rating', 'score', 'تقييم', 'summary', 'description',
       'قصة', 'وصف', 'status', 'حالة', 'synopsis',
     ];
-    function findContext(raw, keyword, maxHits = 2) {
+    function findContext(raw, keyword, maxHits = 2, windowSize = 160) {
       const results = [];
       const lower = raw.toLowerCase();
       let idx = lower.indexOf(keyword.toLowerCase());
       let hits = 0;
       while (idx !== -1 && hits < maxHits) {
-        const start = Math.max(0, idx - 60);
-        const end = Math.min(raw.length, idx + keyword.length + 100);
+        const start = Math.max(0, idx - Math.floor(windowSize * 0.3));
+        const end = Math.min(raw.length, idx + keyword.length + Math.floor(windowSize * 0.7));
         results.push(raw.slice(start, end).replace(/\s+/g, ' '));
         hits++;
         idx = lower.indexOf(keyword.toLowerCase(), idx + keyword.length);
@@ -410,7 +419,26 @@
           }
         }
         if (!anyFound) {
-          printLog(`   ⚠️ ما لكيت ولا كلمة من الكلمات المفتاحية بكل الصفحة — هذا مؤشر قوي إن البيانات تنجاب بجافاسكربت بعد ما تفتح الصفحة (مو موجودة بالخام إطلاقاً).`);
+          printLog(`   ⚠️ ما لكيت ولا كلمة من الكلمات المفتاحية بكل الصفحة.`);
+        }
+
+        // الموقع مبني بـ Astro (شفنا astro-view-transitions) — Astro
+        // غالباً يخزن بيانات كل صفحة جوا خاصية "props" بوسم
+        // <astro-island>. هذا أرجح مكان توكد فيه البيانات الحقيقية.
+        printLog(`\n  🏝️ بحث عن astro-island (مكان تخزين بيانات الصفحة بمواقع Astro):`);
+        const islandHits = findContext(raw, 'astro-island', 6, 350);
+        if (islandHits.length) {
+          islandHits.forEach(h => printLog(`      ...${h}...`));
+        } else {
+          printLog(`   ⚠️ ماكو astro-island بهذي الصفحة.`);
+        }
+
+        // نبحث عن كل مكان يتكرر فيه عنوان المانهوا نفسه — غالباً
+        // يكون جوا الكتلة اللي فيها بقية بيانات نفس المانهوا (تقييم، تصنيف)
+        if (title && title !== '(ماكو عنوان)') {
+          printLog(`\n  🎯 بحث عن كل مكان يتكرر فيه اسم "${title}" بالصفحة (يمكن يكون جنبه بيانات ثانية):`);
+          const titleHits = findContext(raw, title, 6, 350);
+          titleHits.forEach((h, i) => printLog(`      [${i + 1}] ...${h}...`));
         }
 
         // نحاول نلكط ملف الجافاسكربت الرئيسي ونشوف فيه رابط API
