@@ -311,7 +311,77 @@
       if (!s) return '';
       return s.replace(/<\/?[a-z][^>]*>/gi, ' ').replace(/\s+/g, ' ').trim();
     }
-    function extractDescription(mDoc) {
+    // ============================================================
+    // نظام قراءة "جزر Astro" — كل مكون بالصفحة (تقييم، تصنيفات،
+    // حالة...) يخزن بياناته الحقيقية بخاصية "props" على وسم
+    // <astro-island>. هذا يقرا كل الجزر، ويدور تلقائياً بداخل كل
+    // وحدة عن أي مفتاح اسمه يشبه اللي نريده — بدل الاعتماد على اسم
+    // جزيرة وحدة بس (لو الموقع تغيّر شوي، النظام لسه يلكطها).
+    // ============================================================
+    function decodeHtmlEntities(s) {
+      return s.replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+    }
+    function unwrapDevalue(v) {
+      // Astro يخزن كل قيمة كـ [نوع, القيمة الحقيقية] — هذا يفك التغليف
+      if (Array.isArray(v) && v.length === 2 && typeof v[0] === 'number') return v[1];
+      return v;
+    }
+    function extractAstroIslands(raw) {
+      const results = {};
+      const tagRe = /<astro-island\b[^>]*?\bprops="([^"]*)"[^>]*?\bopts="([^"]*)"[^>]*>/g;
+      let m;
+      while ((m = tagRe.exec(raw)) !== null) {
+        try {
+          const optsObj = JSON.parse(decodeHtmlEntities(m[2]));
+          const name = optsObj && optsObj.name;
+          if (!name) continue;
+          const propsObj = JSON.parse(decodeHtmlEntities(m[1]));
+          results[name] = propsObj;
+        } catch (e) { /* جزيرة وحدة فشل تحليلها، نكمل بالباقي */ }
+      }
+      return results;
+    }
+    function deepFindValue(obj, keyPattern, wantArray = false) {
+      if (obj == null || typeof obj !== 'object') return null;
+      if (Array.isArray(obj)) {
+        for (const item of obj) { const r = deepFindValue(item, keyPattern, wantArray); if (r !== null) return r; }
+        return null;
+      }
+      for (const [k, v] of Object.entries(obj)) {
+        if (keyPattern.test(k)) {
+          const val = unwrapDevalue(v);
+          if (wantArray && Array.isArray(val)) {
+            const flat = val.map(x => (Array.isArray(x) ? unwrapDevalue(x) : x)).filter(x => typeof x === 'string');
+            if (flat.length) return flat;
+          } else if (!wantArray && val !== null && typeof val !== 'object') {
+            return val;
+          }
+        }
+      }
+      for (const v of Object.values(obj)) { const r = deepFindValue(v, keyPattern, wantArray); if (r !== null) return r; }
+      return null;
+    }
+    function findAcrossIslands(islands, keyPattern, wantArray = false, preferIsland = null) {
+      if (preferIsland && islands[preferIsland]) {
+        const r = deepFindValue(islands[preferIsland], keyPattern, wantArray);
+        if (r !== null) return r;
+      }
+      for (const name of Object.keys(islands)) {
+        const r = deepFindValue(islands[name], keyPattern, wantArray);
+        if (r !== null) return r;
+      }
+      return null;
+    }
+    function extractJsonLdGraph(raw) {
+      const blocks = [];
+      const re = /<script type="application\/ld\+json">([\s\S]*?)<\/script>/g;
+      let m;
+      while ((m = re.exec(raw)) !== null) {
+        try { blocks.push(JSON.parse(m[1])); } catch (e) {}
+      }
+      return blocks;
+    }
+    function extractDescription(mDoc, raw) {
       // مؤكد يشتغل: meta description / og:description (شفناها بالتشخيص)
       const metaDesc = mDoc.querySelector('meta[property="og:description"]')?.content ||
                         mDoc.querySelector('meta[name="description"]')?.content || '';
@@ -320,20 +390,63 @@
       const el = mDoc.querySelector(getActiveProfile().description || '');
       return el ? el.textContent.trim() : '';
     }
-    function extractRating(mDoc) {
-      const el = mDoc.querySelector(getActiveProfile().rating);
+    function extractRating(mDoc, raw) {
+      if (raw) {
+        const islands = extractAstroIslands(raw);
+        const fromIsland = findAcrossIslands(islands, /^(average)?rating$/i, false, 'SeriesSummaryStatsIsland');
+        if (typeof fromIsland === 'number') return fromIsland;
+        if (typeof fromIsland === 'string') { const n = parseFloat(fromIsland); if (!isNaN(n)) return n; }
+        for (const block of extractJsonLdGraph(raw)) {
+          const nodes = block['@graph'] || [block];
+          for (const node of nodes) {
+            const ar = node.aggregateRating;
+            if (ar && ar.ratingValue) { const n = parseFloat(ar.ratingValue); if (!isNaN(n)) return n; }
+          }
+        }
+      }
+      const el = mDoc.querySelector(getActiveProfile().rating || '');
       if (!el) return null;
       const num = parseFloat(el.textContent.replace(',', '.').match(/[\d.]+/)?.[0]);
       return isNaN(num) ? null : num;
     }
-    function extractGenres(mDoc) {
+    function extractGenres(mDoc, raw) {
+      if (raw) {
+        const islands = extractAstroIslands(raw);
+        const fromIsland = findAcrossIslands(islands, /genres?$/i, true);
+        if (Array.isArray(fromIsland) && fromIsland.length) return fromIsland;
+        for (const block of extractJsonLdGraph(raw)) {
+          const nodes = block['@graph'] || [block];
+          for (const node of nodes) {
+            if (Array.isArray(node.genre) && node.genre.length) return node.genre;
+            if (typeof node.genre === 'string') return [node.genre];
+          }
+        }
+      }
       const set = new Set();
-      mDoc.querySelectorAll(getActiveProfile().genres).forEach(a => { const t = a.textContent.trim(); if (t) set.add(t); });
+      mDoc.querySelectorAll(getActiveProfile().genres || '').forEach(a => { const t = a.textContent.trim(); if (t) set.add(t); });
       return [...set];
     }
-    function extractStatus(mDoc) {
-      const el = mDoc.querySelector(getActiveProfile().status);
+    function extractStatus(mDoc, raw) {
+      if (raw) {
+        const islands = extractAstroIslands(raw);
+        const fromIsland = findAcrossIslands(islands, /^(series)?status$/i, false);
+        if (typeof fromIsland === 'string' && fromIsland) return fromIsland;
+        for (const block of extractJsonLdGraph(raw)) {
+          const nodes = block['@graph'] || [block];
+          for (const node of nodes) {
+            if (typeof node.status === 'string') return node.status;
+            if (typeof node.creativeWorkStatus === 'string') return node.creativeWorkStatus;
+          }
+        }
+      }
+      const el = mDoc.querySelector(getActiveProfile().status || '');
       return el ? el.textContent.trim() : '';
+    }
+    function extractChapterCountHint(raw) {
+      if (!raw) return null;
+      const islands = extractAstroIslands(raw);
+      const v = findAcrossIslands(islands, /^chapterscount$/i, false, 'SeriesTabsNavIsland');
+      return typeof v === 'number' ? v : null;
     }
     function extractChapterLinks(mDoc) {
       const anchors = Array.from(mDoc.querySelectorAll('a'));
@@ -394,10 +507,11 @@
       try {
         const { doc: mDoc, raw } = await fetchViaProxy(url);
         const title = cleanSeriesTitle(mDoc.querySelector('meta[property="og:title"]')?.content || mDoc.title || '(ماكو عنوان)');
-        const desc = extractDescription(mDoc);
-        const rating = extractRating(mDoc);
-        const genres = extractGenres(mDoc);
-        const status = extractStatus(mDoc);
+        const desc = extractDescription(mDoc, raw);
+        const rating = extractRating(mDoc, raw);
+        const genres = extractGenres(mDoc, raw);
+        const status = extractStatus(mDoc, raw);
+        const chapterCountHint = extractChapterCountHint(raw);
         const chapters = extractChapterLinks(mDoc);
 
         printLog(`  📌 العنوان: ${title}`);
@@ -405,7 +519,7 @@
         printLog(`  ⭐ التقييم (بالسيلكتور الحالي): ${rating !== null ? rating : '❌ ماكو'}`);
         printLog(`  🏷️ التصنيفات (بالسيلكتور الحالي): ${genres.length ? genres.join('، ') : '❌ ماكو'}`);
         printLog(`  📊 الحالة (بالسيلكتور الحالي): ${status || '❌ ماكو'}`);
-        printLog(`  📚 عدد الفصول الملقوطة: ${chapters.length}`);
+        printLog(`  📚 عدد الفصول الملقوطة (بالروابط): ${chapters.length}${chapterCountHint !== null ? ` | العدد الحقيقي من بيانات الصفحة: ${chapterCountHint}` : ''}`);
         printLog(`  📄 حجم HTML الخام: ${raw.length} حرف`);
 
         printLog(`\n  🔍 بحث عن كلمات مفتاحية بكل الصفحة (مو بس أول 400 حرف):`);
@@ -477,7 +591,7 @@
       processedUrls.add(mUrl);
 
       try {
-        const { doc: mDoc } = await fetchViaProxy(mUrl);
+        const { doc: mDoc, raw } = await fetchViaProxy(mUrl);
         const title = cleanSeriesTitle(mDoc.querySelector('meta[property="og:title"]')?.content || mDoc.title || "عمل أزورا");
         const slug = safeDocId(title);
         const docRef = doc(db, "manga", slug);
@@ -489,10 +603,10 @@
         }
 
         const cover = cleanUrl(mDoc.querySelector('meta[property="og:image"]')?.content || "");
-        const description = extractDescription(mDoc);
-        const rating = extractRating(mDoc);
-        const genres = extractGenres(mDoc);
-        const status = extractStatus(mDoc);
+        const description = extractDescription(mDoc, raw);
+        const rating = extractRating(mDoc, raw);
+        const genres = extractGenres(mDoc, raw);
+        const status = extractStatus(mDoc, raw);
 
         await setDoc(docRef, {
           title, titleNormalized: normalizeTitle(title),
@@ -682,15 +796,15 @@
         const ratingSuspect = it.data.rating === undefined || it.data.rating === null || it.data.rating === 8 || it.data.rating === 8.0;
         const needsFetch = !it.data.description || ratingSuspect || !it.data.genres || it.data.genres.length === 0 || !it.data.cover || !it.data.status || it.data.status === 'مستمر';
 
-        let mDoc = null;
+        let mDoc = null, rawHtml = null;
         if (needsFetch) {
           const result = await fetchViaProxy(it.data.sourceUrl);
-          mDoc = result.doc;
-          if (!it.data.description) { const d = extractDescription(mDoc); if (d) { updates.description = d; changes.push('+قصة'); } }
-          if (ratingSuspect) { const r = extractRating(mDoc); if (r !== null && r !== it.data.rating) { updates.rating = r; changes.push(`تقييم ${it.data.rating ?? '؟'}→${r}`); } }
-          if (!it.data.genres || it.data.genres.length === 0) { const g = extractGenres(mDoc); if (g.length) { updates.genres = g; changes.push(`+${g.length} تصنيف`); } }
+          mDoc = result.doc; rawHtml = result.raw;
+          if (!it.data.description) { const d = extractDescription(mDoc, rawHtml); if (d) { updates.description = d; changes.push('+قصة'); } }
+          if (ratingSuspect) { const r = extractRating(mDoc, rawHtml); if (r !== null && r !== it.data.rating) { updates.rating = r; changes.push(`تقييم ${it.data.rating ?? '؟'}→${r}`); } }
+          if (!it.data.genres || it.data.genres.length === 0) { const g = extractGenres(mDoc, rawHtml); if (g.length) { updates.genres = g; changes.push(`+${g.length} تصنيف`); } }
           if (!it.data.cover) { const c = cleanUrl(mDoc.querySelector('meta[property="og:image"]')?.content || ''); if (c) { updates.cover = c; updates.coverUrl = c; updates.image = c; changes.push('+غلاف'); } }
-          const st = extractStatus(mDoc); if (st && st !== it.data.status) { updates.status = st; changes.push(`حالة→${st}`); }
+          const st = extractStatus(mDoc, rawHtml); if (st && st !== it.data.status) { updates.status = st; changes.push(`حالة→${st}`); }
           if (!it.data.titleNormalized) updates.titleNormalized = normalizeTitle(it.data.title);
           const cleanTitle = cleanSeriesTitle(it.data.title);
           if (cleanTitle !== it.data.title) { updates.title = cleanTitle; changes.push('نظّف العنوان'); }
