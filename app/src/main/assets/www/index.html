@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://js.puter.com/v2/"></script>
   <title>ساحب أزورا 12 - مواقع متعددة + روابط يدوية ⚡</title>
   <style>
     :root { --main: #ff9800; --bg: #0b0b0e; --card: #16161a; --border: #26262e; --ok:#4caf50; --info:#2196f3; --purple:#9c27b0; }
@@ -69,6 +70,11 @@
     <h4>⚙️ عمال ومزامنة</h4>
     <label>عدد العمال المتوازيين</label>
     <input type="number" id="workerCount" value="50">
+
+    <label style="display:flex; align-items:center; gap:6px; font-size:12px; color:#ccc;">
+      <input type="checkbox" id="aiFallbackEnabled" checked style="width:auto; margin:0;">
+      🤖 استخدم AI مجاني (Puter.js) لأي حقل يفشل بيه الاستخراج العادي (بدون API key)
+    </label>
 
     <div class="controls">
       <button class="btn" id="startBtn">🚀 سحب أرشيف كامل</button>
@@ -409,7 +415,7 @@
       const num = parseFloat(el.textContent.replace(',', '.').match(/[\d.]+/)?.[0]);
       return isNaN(num) ? null : num;
     }
-    function extractGenres(mDoc, raw) {
+    async function extractGenres(mDoc, raw) {
       if (raw) {
         const islands = extractAstroIslands(raw);
         const fromIsland = findAcrossIslands(islands, /genres?$/i, true);
@@ -421,6 +427,14 @@
             if (typeof node.genre === 'string') return [node.genre];
           }
         }
+        const selEl = mDoc.querySelectorAll(getActiveProfile().genres || '');
+        const set = new Set();
+        selEl.forEach(a => { const t = a.textContent.trim(); if (t) set.add(t); });
+        if (set.size) return [...set];
+        // آخر حل: AI مجاني يدور جوا نفس بيانات الجزر عن التصنيفات
+        const aiResult = await aiExtractField(islands, 'genres', 'قائمة تصنيفات/أجناس المانهوا (Action, Fantasy...) كـ array من النصوص');
+        if (Array.isArray(aiResult) && aiResult.length) return aiResult;
+        return [];
       }
       const set = new Set();
       mDoc.querySelectorAll(getActiveProfile().genres || '').forEach(a => { const t = a.textContent.trim(); if (t) set.add(t); });
@@ -447,6 +461,43 @@
       const islands = extractAstroIslands(raw);
       const v = findAcrossIslands(islands, /^chapterscount$/i, false, 'SeriesTabsNavIsland');
       return typeof v === 'number' ? v : null;
+    }
+
+    // ============================================================
+    // 🤖 احتياط AI مجاني (Puter.js — بدون API key) — يشتغل بس لو
+    // الطرق العادية فشلت بحقل معين. نبعث الجزر المستخرجة (مو الصفحة
+    // كاملة) حتى يكون سريع وخفيف. محدود بعدد طلبات متزامنة قليل حتى
+    // ما نحمّل الخدمة المجانية أكثر من اللازم.
+    // ============================================================
+    let aiActiveCalls = 0;
+    const AI_MAX_CONCURRENT = 3;
+    async function aiLimiter() {
+      while (aiActiveCalls >= AI_MAX_CONCURRENT) await new Promise(r => setTimeout(r, 300));
+      aiActiveCalls++;
+    }
+    function aiRelease() { aiActiveCalls = Math.max(0, aiActiveCalls - 1); }
+
+    async function aiExtractField(islandsObj, fieldName, fieldHint) {
+      if (!document.getElementById('aiFallbackEnabled').checked) return null;
+      if (typeof puter === 'undefined' || !puter.ai) return null;
+      await aiLimiter();
+      try {
+        const compact = JSON.stringify(islandsObj).slice(0, 6000); // نحدد الحجم حتى يكون سريع
+        const prompt =
+          `بيانات JSON التالية مستخرجة من صفحة مانهوا (اسمها مكونات "islands" لموقع Astro). ` +
+          `دورلي بس على حقل "${fieldName}" (${fieldHint}). ` +
+          `رد بصيغة JSON فقط بشكل {"${fieldName}": <القيمة أو null>} بدون أي شرح أو نص زيادة.\n\nالبيانات:\n${compact}`;
+        const res = await puter.ai.chat(prompt, { model: 'inclusionai/ling-2.6-flash:free' });
+        const text = (res && res.message && res.message.content) || (typeof res === 'string' ? res : '');
+        const jsonMatch = text.match(/\{[\s\S]*\}/);
+        if (!jsonMatch) return null;
+        const parsed = JSON.parse(jsonMatch[0]);
+        return parsed[fieldName] ?? null;
+      } catch (e) {
+        return null;
+      } finally {
+        aiRelease();
+      }
     }
     function extractChapterLinks(mDoc) {
       const anchors = Array.from(mDoc.querySelectorAll('a'));
@@ -509,7 +560,7 @@
         const title = cleanSeriesTitle(mDoc.querySelector('meta[property="og:title"]')?.content || mDoc.title || '(ماكو عنوان)');
         const desc = extractDescription(mDoc, raw);
         const rating = extractRating(mDoc, raw);
-        const genres = extractGenres(mDoc, raw);
+        const genres = await extractGenres(mDoc, raw);
         const status = extractStatus(mDoc, raw);
         const chapterCountHint = extractChapterCountHint(raw);
         const chapters = extractChapterLinks(mDoc);
@@ -605,7 +656,7 @@
         const cover = cleanUrl(mDoc.querySelector('meta[property="og:image"]')?.content || "");
         const description = extractDescription(mDoc, raw);
         const rating = extractRating(mDoc, raw);
-        const genres = extractGenres(mDoc, raw);
+        const genres = await extractGenres(mDoc, raw);
         const status = extractStatus(mDoc, raw);
 
         await setDoc(docRef, {
@@ -802,7 +853,7 @@
           mDoc = result.doc; rawHtml = result.raw;
           if (!it.data.description) { const d = extractDescription(mDoc, rawHtml); if (d) { updates.description = d; changes.push('+قصة'); } }
           if (ratingSuspect) { const r = extractRating(mDoc, rawHtml); if (r !== null && r !== it.data.rating) { updates.rating = r; changes.push(`تقييم ${it.data.rating ?? '؟'}→${r}`); } }
-          if (!it.data.genres || it.data.genres.length === 0) { const g = extractGenres(mDoc, rawHtml); if (g.length) { updates.genres = g; changes.push(`+${g.length} تصنيف`); } }
+          if (!it.data.genres || it.data.genres.length === 0) { const g = await extractGenres(mDoc, rawHtml); if (g.length) { updates.genres = g; changes.push(`+${g.length} تصنيف`); } }
           if (!it.data.cover) { const c = cleanUrl(mDoc.querySelector('meta[property="og:image"]')?.content || ''); if (c) { updates.cover = c; updates.coverUrl = c; updates.image = c; changes.push('+غلاف'); } }
           const st = extractStatus(mDoc, rawHtml); if (st && st !== it.data.status) { updates.status = st; changes.push(`حالة→${st}`); }
           if (!it.data.titleNormalized) updates.titleNormalized = normalizeTitle(it.data.title);
