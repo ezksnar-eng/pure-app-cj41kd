@@ -426,7 +426,7 @@
         // غالباً يخزن بيانات كل صفحة جوا خاصية "props" بوسم
         // <astro-island>. هذا أرجح مكان توكد فيه البيانات الحقيقية.
         printLog(`\n  🏝️ بحث عن astro-island (مكان تخزين بيانات الصفحة بمواقع Astro):`);
-        const islandHits = findContext(raw, 'astro-island', 6, 350);
+        const islandHits = findContext(raw, '<astro-island uid=', 15, 900);
         if (islandHits.length) {
           islandHits.forEach(h => printLog(`      ...${h}...`));
         } else {
