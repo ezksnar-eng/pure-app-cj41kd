@@ -24,12 +24,8 @@ jobs:
           gradle-version: "8.7"
       - name: Build APK
         run: |
-          if [ -f gradlew ]; then
-            chmod +x gradlew
-            ./gradlew -I pure-init.gradle assembleDebug --no-daemon --console=plain
-          else
-            gradle -I pure-init.gradle assembleDebug --no-daemon --console=plain
-          fi
+          if [ -f gradlew ]; then chmod +x gradlew; GRADLE='./gradlew'; else GRADLE='gradle'; fi
+          $GRADLE -I pure-init.gradle assembleDebug --no-daemon --console=plain
       - name: Collect APK
         run: |
           apk=$(find . -path "*/build/outputs/apk/debug/*.apk" | head -n 1)
@@ -39,7 +35,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: app-apk
-          path: app.apk
+          path: |
+            app.apk
       - name: Publish release
         env:
           GH_TOKEN: ${{ github.token }}

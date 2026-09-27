@@ -292,15 +292,21 @@
     async function fetchViaProxy(targetUrl) {
       const safeUrlV = cleanUrl(targetUrl);
       const proxyEndpoint = `http://127.0.0.1:8080/?url=${encodeURIComponent(safeUrlV)}`;
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 20000); // 20 ثانية أقصى انتظار للبروكسي
       try {
-        const res = await fetch(proxyEndpoint, { cache: "no-store" });
+        const res = await fetch(proxyEndpoint, { cache: "no-store", signal: controller.signal });
+        clearTimeout(timeoutId);
         if (res.ok) {
           const html = await res.text();
           if (html && html.length > 200 && !html.includes("Error fetching site")) {
             return { doc: new DOMParser().parseFromString(html, 'text/html'), raw: html };
           }
         }
-      } catch (e) {}
+      } catch (e) {
+        clearTimeout(timeoutId);
+        if (e.name === 'AbortError') throw new Error("⏱️ البروكسي ما رد خلال 20 ثانية (علّق أو الموقع بطيء).");
+      }
       throw new Error("فشل الاتصال بالبروكسي بالخلفية.");
     }
 
@@ -617,9 +623,21 @@
     // ============================================================
     // معالجة مانهوا وحدة
     // ============================================================
+    // ============================================================
+    // حماية من التعليق الصامت: أي خطوة تحطها هنا لازم تخلص خلال
+    // مدة محددة، وإلا ترمي خطأ واضح بدل ما تعلّق للأبد بصمت
+    // ============================================================
+    function withTimeout(promise, ms, label) {
+      return Promise.race([
+        promise,
+        new Promise((_, reject) => setTimeout(() => reject(new Error(`⏱️ انتهت المهلة (${label}) بعد ${ms / 1000} ثانية — يمكن مشكلة اتصال بقاعدة البيانات`)), ms)),
+      ]);
+    }
+
     async function processSingleManga(mUrl) {
       if (processedUrls.has(mUrl)) return;
       processedUrls.add(mUrl);
+      printLog(`  ▶️ بدء معالجة: ${mUrl}`);
 
       try {
         const { doc: mDoc, raw } = await fetchViaProxy(mUrl);
@@ -627,7 +645,8 @@
         const slug = safeDocId(title);
         const docRef = doc(db, "manhwa", slug);
 
-        const existing = await getDoc(docRef);
+        printLog(`  🔎 يتأكد إذا موجودة بقاعدة البيانات...`);
+        const existing = await withTimeout(getDoc(docRef), 15000, 'فحص وجود المانهوا');
         if (existing.exists()) {
           printLog(`  ⏭️ [موجودة مسبقاً - تم التجاوز]: ${title}`);
           return;
@@ -639,14 +658,15 @@
         const genres = extractGenres(mDoc, raw);
         const status = extractStatus(mDoc, raw);
 
-        await setDoc(docRef, {
+        printLog(`  💾 يكتب البيانات بقاعدة البيانات...`);
+        await withTimeout(setDoc(docRef, {
           title, titleNormalized: normalizeTitle(title),
           cover, coverUrl: cover, image: cover,
           description, rating, genres,
           sourceUrl: mUrl, sourceSite: (new URL(mUrl)).hostname, type: "مانهوا",
           status: status || "غير معروف",
           createdAt: serverTimestamp(), updatedAt: serverTimestamp()
-        });
+        }), 15000, 'كتابة بيانات المانهوا');
 
         mangaCount++; renderStats(); saveState();
         printLog(`  ✨ [رفع جديد]: ${title} (${slug})`);
@@ -768,7 +788,9 @@
     async function scrapeManualLinks() {
       const raw = document.getElementById('manualLinks').value.trim();
       if (!raw) { printLog('❌ ماكو روابط ملصوقة.'); return; }
-      const links = raw.split('\n').map(l => l.trim()).filter(Boolean);
+      const links = raw.split('\n')
+        .map(l => { const m = l.match(/https?:\/\/\S+/i); return m ? m[0].trim() : l.trim(); })
+        .filter(Boolean);
       RUNNING = true; setBusyUI(true);
       document.getElementById('status').innerText = `🔗 سحب ${links.length} رابط يدوي...`;
       await requestWakeLock();
