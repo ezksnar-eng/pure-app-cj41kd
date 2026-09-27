@@ -424,7 +424,15 @@
       }
       const selEl = mDoc.querySelectorAll(getActiveProfile().genres || '');
       const set = new Set();
-      selEl.forEach(a => { const t = a.textContent.trim(); if (t) set.add(t); });
+      const seenNorm = new Set();
+      function addGenre(t) {
+        if (!t) return;
+        const norm = t.normalize('NFKC').replace(/[إأآا]/g, 'ا').toLowerCase().trim();
+        if (seenNorm.has(norm)) return;
+        seenNorm.add(norm);
+        set.add(t.trim());
+      }
+      selEl.forEach(a => addGenre(a.textContent.trim()));
       if (set.size) return [...set];
       // آخر حل بدون AI ولا حساب: أي رابط بالصفحة رابطه فيه ?genres= أو /genre/
       // (نفس نمط روابط التصنيفات اللي شفناها بقائمة الموقع)
@@ -432,7 +440,7 @@
         const href = a.getAttribute('href') || '';
         if (/[?&]genres?=/i.test(href) || /\/genres?\//i.test(href)) {
           const t = a.textContent.trim();
-          if (t && t.length < 30) set.add(t);
+          if (t && t.length < 30) addGenre(t);
         }
       });
       return [...set];
