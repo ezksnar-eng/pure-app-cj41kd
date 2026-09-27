@@ -694,11 +694,11 @@
             } else {
               markFailed(`فصل بدون محتوى: ${ch.url}`);
             }
-          } catch (chErr) { markFailed(`فصل: ${ch.url}`); }
+          } catch (chErr) { markFailed(`فصل: ${ch.url} — ${chErr.message}`); }
         }
         printChange(`   ↳ ${addedChaps} فصل من أصل ${uniqueChaps.length} رابط مكتشف`);
       } catch (err) {
-        markFailed(`عمل: ${mUrl}`);
+        markFailed(`عمل: ${mUrl} — ${err.message}`);
       }
     }
 
@@ -775,7 +775,7 @@
           const nextEl = pDoc.querySelector(profile.nextPage);
           pageUrl = nextEl ? cleanUrl(nextEl.getAttribute('href') || nextEl.href) : null;
         } catch (pErr) {
-          markFailed(`صفحة أرشيف رقم ${pageNum}`);
+          markFailed(`صفحة أرشيف رقم ${pageNum} — ${pErr.message}`);
           break;
         }
       }
@@ -913,7 +913,7 @@
               chapCount++; if (isNovel) novelChapCount++;
               renderStats(); saveState();
             }
-          } catch (e) { markFailed(`فصل جديد: ${ch.url}`); }
+          } catch (e) { markFailed(`فصل جديد: ${ch.url} — ${e.message}`); }
         }
         if (newChaps.length > 0) changes.push(`+${newChaps.length} فصل جديد`);
 
@@ -968,7 +968,7 @@
               chapCount++; if (isNovel) novelChapCount++;
               renderStats(); saveState();
             }
-          } catch (e) { markFailed(`فصل جديد: ${ch.url}`); }
+          } catch (e) { markFailed(`فصل جديد: ${ch.url} — ${e.message}`); }
         }
         printChange(`🆕 ${it.data.title}: +${newChaps.length} فصل جديد`);
       }, 'فصول جديدة');
