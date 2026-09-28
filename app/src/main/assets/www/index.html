@@ -473,31 +473,145 @@
       const v = findAcrossIslands(islands, /^chapterscount$/i, false, 'SeriesTabsNavIsland');
       return typeof v === 'number' ? v : null;
     }
-    function extractChapterLinks(mDoc) {
+    // روابط الفصول: أول شي نطلب النمط الصارم .../series/<اسم>/chapter-<رقم> (وبنفس المانهوا بس)،
+    // وإذا ما لكينا نرجع للطريقة الواسعة القديمة. الرقم ياخذ من الرابط نفسه (أضمن من نص الرابط).
+    function extractChapterLinks(mDoc, seriesUrl) {
       const anchors = Array.from(mDoc.querySelectorAll('a'));
-      const candidates = anchors
-        .map(a => ({ url: cleanUrl(a.href || a.getAttribute('href')), txt: a.innerText.trim() }))
-        .filter(c => c.url && (
-          c.url.includes('chapter') || c.url.includes('/ch-') || c.url.includes('/ep-') ||
-          c.url.includes('episode') || /\/\d+\/?$/.test(c.url.replace(/\/$/, '')) ||
-          c.txt.includes('فصل') || /^\d+(\.\d+)?$/.test(c.txt)
-        ));
+      const all = anchors
+        .map(a => ({ url: cleanUrl(a.getAttribute('href') || a.href), txt: a.innerText.trim() }))
+        .filter(c => c.url);
+
+      const strictRe = /\/chapter-(\d+(?:[.\-]\d+)?)\/?$/i;
+      const stripUrl = u => u.replace(/[?#].*$/, '').replace(/\/$/, '');
+      let strict = all.filter(c => strictRe.test(stripUrl(c.url)));
+      if (seriesUrl) {
+        const base = stripUrl(cleanUrl(seriesUrl)).toLowerCase();
+        const same = strict.filter(c => stripUrl(c.url).toLowerCase().startsWith(base + '/'));
+        if (same.length) strict = same;
+      }
+      if (strict.length) {
+        const seen = new Set(); const out = [];
+        strict.forEach(c => {
+          const key = stripUrl(c.url);
+          if (seen.has(key)) return;
+          seen.add(key);
+          out.push({ url: key, txt: key.match(strictRe)[1].replace('-', '.') });
+        });
+        return out;
+      }
+
+      // احتياط: الطريقة الواسعة (لمواقع ثانية)
+      const candidates = all.filter(c => (
+        c.url.includes('chapter') || c.url.includes('/ch-') || c.url.includes('/ep-') ||
+        c.url.includes('episode') || /\/\d+\/?$/.test(c.url.replace(/\/$/, '')) ||
+        c.txt.includes('فصل') || /^\d+(\.\d+)?$/.test(c.txt)
+      ));
       const unique = []; const seen = new Set();
       candidates.forEach(c => { if (!seen.has(c.url)) { seen.add(c.url); unique.push(c); } });
       return unique;
     }
-    async function extractChapterContent(chDoc) {
-      const profile = getActiveProfile();
-      const imgElements = Array.from(chDoc.querySelectorAll(profile.pageImage || 'img'));
-      const rawImgs = imgElements.map(img => img.getAttribute('data-src') || img.getAttribute('lazy-src') || img.src).filter(Boolean);
-      const validImgs = [...new Set(rawImgs)].map(u => cleanUrl(u)).filter(src => src && (src.includes('.jpg') || src.includes('.png') || src.includes('.webp') || src.includes('uploads')));
-      if (validImgs.length > 0) return { isNovel: false, images: validImgs, content: '' };
+    // ============================================================
+    // محتوى الفصل: صور (مانهوا) أو نص (رواية). الموقع مبني بـ Astro، فالصور
+    // غالباً مخبية بـ props الجزر مو بوسوم <img> عادية — لهذا نجرب أكثر من طريقة
+    // بالترتيب: (1) الجزر  (2) سيلكتورات/وسوم img  (3) بحث بكل الـ HTML الخام.
+    // ============================================================
+    const IMG_URL_RE = /https?:\/\/[^\s"'\\<>()]+?\.(?:jpe?g|png|webp|avif)(?:\?[^\s"'\\<>()]*)?/gi;
+    const IMG_EXCLUDE_RE = /avatar|featured|logo|banner|favicon|emoji|sprite|placeholder|\/icons?\//i;
 
-      let paragraphs = [];
-      const found = chDoc.querySelectorAll(profile.textContent || '');
-      found.forEach(p => { const t = p.textContent.trim(); if (t) paragraphs.push(t); });
+    function collectImageUrls(text, excludeUrl) {
+      const out = []; const seen = new Set();
+      if (!text) return out;
+      const decoded = text.replace(/&quot;/g, '"').replace(/&amp;/g, '&').replace(/\\\//g, '/');
+      const re = new RegExp(IMG_URL_RE.source, 'gi');
+      let m;
+      while ((m = re.exec(decoded)) !== null) {
+        const u = m[0];
+        if (seen.has(u)) continue;
+        seen.add(u);
+        if (excludeUrl && u === excludeUrl) continue;
+        if (IMG_EXCLUDE_RE.test(u)) continue;
+        out.push(u);
+      }
+      return out;
+    }
+    // صور الفصل عادةً كلها بنفس المجلد — نختار أكبر مجموعة بنفس المجلد حتى نتخلص من صور جانبية (أفاتار، مقترحات)
+    function pickMainImageGroup(urls) {
+      if (urls.length <= 2) return urls;
+      const dirOf = u => u.replace(/[?#].*$/, '').replace(/\/[^\/]*$/, '');
+      const counts = new Map();
+      urls.forEach(u => { const d = dirOf(u); counts.set(d, (counts.get(d) || 0) + 1); });
+      let bestDir = null, best = 0;
+      counts.forEach((n, d) => { if (n > best) { best = n; bestDir = d; } });
+      return best >= 2 ? urls.filter(u => dirOf(u) === bestDir) : urls;
+    }
+    function extractImagesFromIslands(raw, coverUrl) {
+      const islands = extractAstroIslands(raw);
+      let best = [];
+      for (const name of Object.keys(islands)) {
+        const urls = collectImageUrls(JSON.stringify(islands[name]), coverUrl);
+        if (urls.length > best.length) best = urls;
+      }
+      return pickMainImageGroup(best);
+    }
+    function htmlToParagraphs(html) {
+      const t = html.replace(/<\/(p|div|h[1-6]|li)>|<br\s*\/?>/gi, '\n').replace(/<[^>]+>/g, '');
+      return t.split(/\n+/).map(x => x.replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim()).filter(Boolean);
+    }
+    // نص الرواية: أطول نص بالجزر يكون فعلاً نص (مو svg ولا رابط)
+    function extractNovelParagraphsFromIslands(raw) {
+      const islands = extractAstroIslands(raw);
+      let bestParas = []; let bestLen = 0;
+      const walk = (v) => {
+        if (typeof v === 'string') {
+          if (v.length < 300 || /^\s*<svg/i.test(v)) return;
+          const paras = htmlToParagraphs(v);
+          const plain = paras.join(' ');
+          const letters = (plain.match(/[A-Za-z\u0600-\u06FF]/g) || []).length;
+          if (plain.length > 300 && letters / plain.length > 0.6 && plain.length > bestLen) {
+            bestLen = plain.length; bestParas = paras;
+          }
+          return;
+        }
+        if (Array.isArray(v)) { v.forEach(walk); return; }
+        if (v && typeof v === 'object') Object.values(v).forEach(walk);
+      };
+      Object.keys(islands).forEach(n => walk(islands[n]));
+      return bestParas;
+    }
+
+    async function extractChapterContent(chDoc, raw) {
+      const profile = getActiveProfile();
+      const coverUrl = chDoc.querySelector('meta[property="og:image"]')?.content || '';
+
+      // (1) الجزر
+      let images = raw ? extractImagesFromIslands(raw, coverUrl) : [];
+      const novelParas = raw ? extractNovelParagraphsFromIslands(raw) : [];
+      if (novelParas.length && images.length < 3) {
+        return { isNovel: true, images: [], content: novelParas.join('\n\n') };
+      }
+      if (images.length > 0) return { isNovel: false, images, content: '' };
+
+      // (2) وسوم img بالصفحة (سيلكتور الموقع أول، بعدين أي img)
+      const grab = (sel) => Array.from(chDoc.querySelectorAll(sel))
+        .map(img => img.getAttribute('data-src') || img.getAttribute('data-lazy-src') || img.getAttribute('lazy-src') || img.getAttribute('src') || '')
+        .filter(Boolean).map(u => cleanUrl(u));
+      const isImg = u => /\.(jpe?g|png|webp|avif)(\?|$)/i.test(u) && !IMG_EXCLUDE_RE.test(u) && u !== coverUrl;
+      let domImgs = [...new Set(grab(profile.pageImage || 'img').filter(isImg))];
+      if (!domImgs.length) domImgs = [...new Set(grab('img').filter(isImg))];
+      domImgs = pickMainImageGroup(domImgs);
+      if (domImgs.length > 0) return { isNovel: false, images: domImgs, content: '' };
+
+      // نص رواية بوسوم عادية
+      const paragraphs = [];
+      chDoc.querySelectorAll(profile.textContent || 'p').forEach(p => { const t = p.textContent.trim(); if (t) paragraphs.push(t); });
       const content = paragraphs.join('\n\n').trim();
-      if (content.length > 50) return { isNovel: true, images: [], content };
+      if (content.length > 300) return { isNovel: true, images: [], content };
+
+      // (3) آخر حل: أي رابط صورة بالـ HTML الخام كله
+      if (raw) {
+        const rawImgs = pickMainImageGroup(collectImageUrls(raw, coverUrl));
+        if (rawImgs.length >= 2) return { isNovel: false, images: rawImgs, content: '' };
+      }
       return { isNovel: false, images: [], content: '' };
     }
 
@@ -525,19 +639,67 @@
       return results;
     }
 
+    // تشخيص فصل: ملخص قصير (مو سجل ضخم) يوريك شنو لكط الكود بصفحة الفصل
+    async function diagnoseChapter(url, chDoc, raw) {
+      printLog(`  📖 هذا رابط فصل — تشخيص مخصص للفصول:`);
+      printLog(`  📄 حجم HTML: ${raw.length} حرف`);
+      const islands = extractAstroIslands(raw);
+      const names = Object.keys(islands);
+      printLog(`  🏝️ عدد الجزر: ${names.length}`);
+      const coverUrl = chDoc.querySelector('meta[property="og:image"]')?.content || '';
+      names.forEach(n => {
+        const keys = Object.keys(islands[n] || {}).slice(0, 8).join('، ');
+        const imgs = collectImageUrls(JSON.stringify(islands[n]), coverUrl).length;
+        if (imgs > 0 || /chapter|reader|page|image|content|novel/i.test(n)) {
+          printLog(`     • ${n} — صور: ${imgs} — مفاتيح: ${keys}`);
+        }
+      });
+      const imgTags = Array.from(chDoc.querySelectorAll('img'));
+      printLog(`  🖼️ وسوم <img> بالصفحة: ${imgTags.length}`);
+      imgTags.slice(0, 3).forEach(i => printLog(`     ${(i.getAttribute('data-src') || i.getAttribute('src') || '').slice(0, 110)}`));
+      const rawImgs = collectImageUrls(raw, coverUrl);
+      printLog(`  🔗 روابط صور بالـ HTML الخام: ${rawImgs.length}`);
+      rawImgs.slice(0, 3).forEach(u => printLog(`     ${u.slice(0, 110)}`));
+
+      const res = await extractChapterContent(chDoc, raw);
+      printLog(`  ✅ نتيجة الاستخراج: ${res.isNovel ? 'رواية (نص)' : 'مانهوا (صور)'} — صور: ${res.images.length} — حروف نص: ${res.content.length}`);
+      res.images.slice(0, 2).forEach(u => printLog(`     ${u.slice(0, 110)}`));
+      if (res.content) printLog(`     ${res.content.slice(0, 120)}...`);
+
+      // مؤشرات قفل/شراء (فصول مدفوعة ما تنزل محتواها)
+      const lockKeys = [];
+      const walk = (v, path) => {
+        if (v && typeof v === 'object') {
+          Object.entries(v).forEach(([k, val]) => {
+            if (/lock|premium|price|coin|paid|purchase|subscribe/i.test(k)) {
+              const u = unwrapDevalue(val);
+              if (typeof u !== 'object') lockKeys.push(`${k}=${String(u).slice(0, 30)}`);
+            }
+            walk(val, path + '.' + k);
+          });
+        }
+      };
+      names.forEach(n => walk(islands[n], n));
+      if (lockKeys.length) printLog(`  🔒 مفاتيح قفل/شراء: ${[...new Set(lockKeys)].slice(0, 8).join(' | ')}`);
+      if (res.images.length === 0 && !res.content) {
+        printLog(`  ⚠️ ما انلقط شي. ابعثلي هذا السجل كامل (هو قصير) وأعرف وين مخبي المحتوى.`);
+      }
+    }
+
     async function diagnoseUrl() {
       const url = document.getElementById('diagUrl').value.trim();
       if (!url) { printLog('❌ حط رابط أول.'); return; }
       printLog(`🔬 يشخّص: ${url}`);
       try {
         const { doc: mDoc, raw } = await fetchViaProxy(url);
+        if (/\/chapter-[\d.\-]+\/?$/i.test(url.replace(/[?#].*$/, ''))) { diagnoseChapter(url, mDoc, raw); return; }
         const title = cleanSeriesTitle(mDoc.querySelector('meta[property="og:title"]')?.content || mDoc.title || '(ماكو عنوان)');
         const desc = extractDescription(mDoc, raw);
         const rating = extractRating(mDoc, raw);
         const genres = extractGenres(mDoc, raw);
         const status = extractStatus(mDoc, raw);
         const chapterCountHint = extractChapterCountHint(raw);
-        const chapters = extractChapterLinks(mDoc);
+        const chapters = extractChapterLinks(mDoc, url);
 
         printLog(`  📌 العنوان: ${title}`);
         printLog(`  📖 القصة (بالسيلكتور الحالي): ${desc ? `وجدت (${desc.length} حرف)` : '❌ ماكو'}`);
@@ -647,32 +809,40 @@
 
         printLog(`  🔎 يتأكد إذا موجودة بقاعدة البيانات...`);
         const existing = await withTimeout(getDoc(docRef), 15000, 'فحص وجود المانهوا');
+        // موجودة ومعها فصول → نتجاوز. موجودة بس بدون فصول (مثلاً فشل سحب الفصول أول مرة) → نكمل الفصول بس.
+        let existingChapCount = 0;
         if (existing.exists()) {
-          printLog(`  ⏭️ [موجودة مسبقاً - تم التجاوز]: ${title}`);
-          return;
+          const chSnap = await withTimeout(getDocs(collection(db, `manhwa/${slug}/chapters`)), 15000, 'فحص فصول موجودة');
+          existingChapCount = chSnap.size;
+          if (existingChapCount > 0) {
+            printLog(`  ⏭️ [موجودة مسبقاً ومعها ${existingChapCount} فصل - تم التجاوز]: ${title} (لفحص فصول جديدة استخدم زر 🆕)`);
+            return;
+          }
+          printLog(`  ♻️ موجودة بس بدون فصول — يكمل سحب الفصول: ${title}`);
+        } else {
+          const cover = cleanUrl(mDoc.querySelector('meta[property="og:image"]')?.content || "");
+          const description = extractDescription(mDoc, raw);
+          const rating = extractRating(mDoc, raw);
+          const genres = extractGenres(mDoc, raw);
+          const status = extractStatus(mDoc, raw);
+
+          printLog(`  💾 يكتب البيانات بقاعدة البيانات...`);
+          await withTimeout(setDoc(docRef, {
+            title, titleNormalized: normalizeTitle(title),
+            cover, coverUrl: cover, image: cover,
+            description, rating, genres,
+            sourceUrl: mUrl, sourceSite: (new URL(mUrl)).hostname, type: "مانهوا",
+            status: status || "غير معروف",
+            createdAt: serverTimestamp(), updatedAt: serverTimestamp()
+          }), 15000, 'كتابة بيانات المانهوا');
+
+          mangaCount++; renderStats(); saveState();
+          printLog(`  ✨ [رفع جديد]: ${title} (${slug})`);
+          printChange(`📗 ${title}: عمل جديد — تقييم ${rating ?? '؟'}، ${genres.length} تصنيف، حالة "${status || '؟'}"`);
         }
 
-        const cover = cleanUrl(mDoc.querySelector('meta[property="og:image"]')?.content || "");
-        const description = extractDescription(mDoc, raw);
-        const rating = extractRating(mDoc, raw);
-        const genres = extractGenres(mDoc, raw);
-        const status = extractStatus(mDoc, raw);
-
-        printLog(`  💾 يكتب البيانات بقاعدة البيانات...`);
-        await withTimeout(setDoc(docRef, {
-          title, titleNormalized: normalizeTitle(title),
-          cover, coverUrl: cover, image: cover,
-          description, rating, genres,
-          sourceUrl: mUrl, sourceSite: (new URL(mUrl)).hostname, type: "مانهوا",
-          status: status || "غير معروف",
-          createdAt: serverTimestamp(), updatedAt: serverTimestamp()
-        }), 15000, 'كتابة بيانات المانهوا');
-
-        mangaCount++; renderStats(); saveState();
-        printLog(`  ✨ [رفع جديد]: ${title} (${slug})`);
-        printChange(`📗 ${title}: عمل جديد — تقييم ${rating ?? '؟'}، ${genres.length} تصنيف، حالة "${status || '؟'}"`);
-
-        const uniqueChaps = sortChaptersByNumber(extractChapterLinks(mDoc));
+        const uniqueChaps = sortChaptersByNumber(extractChapterLinks(mDoc, mUrl));
+        printLog(`  📚 لكيت ${uniqueChaps.length} فصل، يبدي يسحبهم...`);
         let addedChaps = 0;
         for (let j = 0; j < uniqueChaps.length; j++) {
           if (!RUNNING) break;
@@ -680,8 +850,8 @@
           const chNum = cleanChapterNumber(ch.txt, j + 1);
           const correctOrder = j + 1;
           try {
-            const { doc: chDoc } = await fetchViaProxy(ch.url);
-            const { isNovel, images, content } = await extractChapterContent(chDoc);
+            const { doc: chDoc, raw: chRaw } = await fetchViaProxy(ch.url);
+            const { isNovel, images, content } = await extractChapterContent(chDoc, chRaw);
             if (images.length > 0 || content.length > 0) {
               await setDoc(doc(db, `manhwa/${slug}/chapters`, chNum), {
                 number: parseFloat(chNum) || correctOrder,
@@ -881,8 +1051,8 @@
 
           if ((!c.data.images || c.data.images.length === 0) && !c.data.content) {
             try {
-              const { doc: chPageDoc } = await fetchViaProxy(c.data.sourceUrl);
-              const { isNovel, images, content } = await extractChapterContent(chPageDoc);
+              const { doc: chPageDoc, raw: chPageRaw } = await fetchViaProxy(c.data.sourceUrl);
+              const { isNovel, images, content } = await extractChapterContent(chPageDoc, chPageRaw);
               if (images.length > 0 || content.length > 0) {
                 await updateDoc(doc(db, `manhwa/${it.id}/chapters`, c.id), { isNovel, images, content });
                 if (isNovel) { novelChapCount++; renderStats(); }
@@ -895,7 +1065,7 @@
         if (orderFixed > 0) changes.push(`صحّح ترتيب ${orderFixed} فصل`);
 
         if (!mDoc) { const result = await fetchViaProxy(it.data.sourceUrl); mDoc = result.doc; }
-        const allChaps = extractChapterLinks(mDoc);
+        const allChaps = extractChapterLinks(mDoc, it.data.sourceUrl);
         const newChaps = sortChaptersByNumber(allChaps.filter(c => !existingUrls.has(c.url)));
         for (let j = 0; j < newChaps.length; j++) {
           if (!RUNNING) break;
@@ -903,8 +1073,8 @@
           const chNum = cleanChapterNumber(ch.txt, chapsSnap.size + j + 1);
           const correctOrder = chapsSnap.size + j + 1;
           try {
-            const { doc: chDocPage } = await fetchViaProxy(ch.url);
-            const { isNovel, images, content } = await extractChapterContent(chDocPage);
+            const { doc: chDocPage, raw: chPageRaw2 } = await fetchViaProxy(ch.url);
+            const { isNovel, images, content } = await extractChapterContent(chDocPage, chPageRaw2);
             if (images.length > 0 || content.length > 0) {
               await setDoc(doc(db, `manhwa/${it.id}/chapters`, chNum), {
                 number: parseFloat(chNum) || correctOrder,
@@ -948,7 +1118,7 @@
         const existingUrls = new Set(chapsSnap.docs.map(c => c.data().sourceUrl));
 
         const { doc: mDoc } = await fetchViaProxy(it.data.sourceUrl);
-        const allChaps = extractChapterLinks(mDoc);
+        const allChaps = extractChapterLinks(mDoc, it.data.sourceUrl);
         const newChaps = sortChaptersByNumber(allChaps.filter(c => !existingUrls.has(c.url)));
         if (newChaps.length === 0) return;
 
@@ -958,8 +1128,8 @@
           const chNum = cleanChapterNumber(ch.txt, chapsSnap.size + j + 1);
           const correctOrder = chapsSnap.size + j + 1;
           try {
-            const { doc: chDocPage } = await fetchViaProxy(ch.url);
-            const { isNovel, images, content } = await extractChapterContent(chDocPage);
+            const { doc: chDocPage, raw: chPageRaw2 } = await fetchViaProxy(ch.url);
+            const { isNovel, images, content } = await extractChapterContent(chDocPage, chPageRaw2);
             if (images.length > 0 || content.length > 0) {
               await setDoc(doc(db, `manhwa/${it.id}/chapters`, chNum), {
                 number: parseFloat(chNum) || correctOrder,
