@@ -1,0 +1,1351 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ساحب أزورا 18 ⚡</title>
+  <style>
+    :root { --main: #ff9800; --bg: #0b0b0e; --card: #16161a; --border: #26262e; --ok:#4caf50; --info:#2196f3; --purple:#9c27b0; }
+    body { font-family: system-ui, -apple-system, sans-serif; background: var(--bg); color: #fff; padding: 15px; margin: 0; }
+    .container { background: var(--card); padding: 20px; border-radius: 18px; max-width: 650px; margin: auto; border: 1px solid var(--border); box-shadow: 0 10px 30px rgba(0,0,0,0.9); }
+    h2 { color: var(--main); text-align: center; margin: 0 0 10px; font-size: 19px; }
+    .status-badge { display: block; text-align: center; padding: 8px 15px; border-radius: 12px; font-size: 13px; font-weight: bold; background: #1f1a0e; color: var(--main); border: 1px solid var(--main); margin-bottom: 15px; }
+    .grid-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 15px; }
+    .stat-card { background: #0e0e11; padding: 12px; border-radius: 10px; text-align: center; border: 1px solid var(--border); }
+    .stat-card h3 { margin: 0; color: var(--main); font-size: 20px; }
+    .stat-card p { margin: 3px 0 0; font-size: 11px; color: #888; }
+    #logBox, #changeLogBox { font-size: 12px; color: #64b5f6; white-space: pre-line; text-align: right; background: #060608; padding: 12px; border-radius: 10px; height: 240px; overflow-y: auto; border: 1px solid var(--border); font-family: monospace; line-height: 1.6; margin-bottom: 10px; }
+    #changeLogBox { color: #a5d6a7; }
+    .controls { display: flex; gap: 10px; margin-bottom: 10px; }
+    .btn { flex: 1; padding: 12px; border-radius: 10px; border: none; font-weight: bold; cursor: pointer; background: var(--main); color: #000; font-size: 13px; }
+    .btn.stop { background: #e53935; color: #fff; }
+    .btn.fix { background: var(--ok); color: #000; }
+    .btn.info { background: var(--info); color: #fff; }
+    .btn.purple { background: var(--purple); color: #fff; }
+    .btn.reset { background: #444; color: #fff; font-size: 12px; }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    input[type=text], input[type=number], textarea, select { width: 100%; padding: 8px 10px; border-radius: 6px; border: 1px solid var(--border); background: #0d0f14; color: #fff; font-size: 13px; margin-bottom: 8px; font-family: inherit; }
+    textarea { min-height: 90px; font-family: monospace; font-size: 11px; direction: ltr; text-align: left; }
+    label { display: block; font-size: 11px; color: #888; margin-bottom: 3px; }
+    h4 { color: #888; font-size: 12px; margin: 16px 0 6px; border-top: 1px solid var(--border); padding-top: 12px; }
+    details { margin-bottom: 10px; }
+    summary { color: var(--info); font-size: 12px; cursor: pointer; margin-bottom: 8px; }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <h2>ساحب أزورا 18 ⚡</h2>
+    <div class="status-badge" id="status">⏳ يفحص نفسه...</div>
+
+    <button class="btn purple" id="selfTestBtn" style="width:100%; margin-bottom:8px">🩺 فحص شامل بضغطة وحدة (اضغطه أول شي)</button>
+    <textarea id="reportBox" readonly placeholder="هنا يطلع تقرير الفحص — اضغط 📋 نسخ وابعثه لي بالشات"></textarea>
+    <button class="btn reset" id="copyReportBtn" style="width:100%; margin-bottom:10px">📋 نسخ التقرير</button>
+
+    <h4>🌐 الموقع الحالي</h4>
+    <label>اختر الموقع (كل موقع إله إعدادات سحب خاصة فيه)</label>
+    <select id="siteSelect"></select>
+
+    <details>
+      <summary>➕ إضافة موقع جديد أو تعديل إعدادات موقع</summary>
+      <label>اسم الموقع (نطاقه، مثلاً azorafly.com)</label>
+      <input type="text" id="newSiteDomain" placeholder="example.com">
+      <label>رابط أرشيف السلاسل عنده</label>
+      <input type="text" id="newSiteBase" placeholder="https://example.com/series/">
+      <label>إعدادات السحب (JSON) — اضغط "شخّص" أول حتى تعرف شنو تحط هنا</label>
+      <textarea id="newSiteJson" placeholder='{"listingCard":"...","listingLink":"...","description":"...","rating":"...","genres":"...","status":"...","pageImage":"...","textContent":"..."}'></textarea>
+      <div class="controls">
+        <button class="btn purple" id="saveSiteBtn">💾 احفظ الموقع</button>
+        <button class="btn reset" id="deleteSiteBtn">🗑️ احذف الموقع الحالي</button>
+      </div>
+    </details>
+
+    <h4>🎯 تحكم بنقطة البداية والروابط اليدوية</h4>
+    <label>ابدأ الأرشيف من رابط معين (فاضي = من البداية)</label>
+    <input type="text" id="startFromUrl" placeholder="مثلاً: https://azorafly.com/series/page/5/">
+
+    <label>أو الصق روابط مانهوا محددة (وحد بالسطر) بدل مسح الأرشيف كله</label>
+    <textarea id="manualLinks" placeholder="https://azorafly.com/series/shadow-slave&#10;https://azorafly.com/series/another-one"></textarea>
+    <div class="controls">
+      <button class="btn purple" id="manualScrapeBtn">🔗 سحب من هذي الروابط بس</button>
+    </div>
+
+    <h4>⚙️ عمال ومزامنة</h4>
+    <label>عدد العمال المتوازيين</label>
+    <input type="number" id="workerCount" value="50">
+
+    <div class="controls">
+      <button class="btn" id="startBtn">🚀 سحب أرشيف كامل</button>
+      <button class="btn stop" id="stopBtn" disabled>⛔ إيقاف</button>
+    </div>
+    <div class="controls">
+      <button class="btn fix" id="fixBtn">🛠️ تعديل شامل (تكرار + ناقص)</button>
+    </div>
+    <div class="controls">
+      <button class="btn fix" id="newChapBtn">🆕 فحص فصول جديدة فقط</button>
+    </div>
+    <div class="controls">
+      <button class="btn reset" id="resetBtn">🗑️ مسح الذاكرة المحلية</button>
+    </div>
+
+    <div class="grid-stats">
+      <div class="stat-card"><h3 id="statManga">0</h3><p>أعمال جديدة</p></div>
+      <div class="stat-card"><h3 id="statChaps">0</h3><p>فصول معالجة</p></div>
+      <div class="stat-card"><h3 id="statImgs">0</h3><p>صور مرفوعة</p></div>
+    </div>
+    <div class="grid-stats">
+      <div class="stat-card"><h3 id="statFailed">0</h3><p>فشل</p></div>
+      <div class="stat-card"><h3 id="statDupes">0</h3><p>مكررات محذوفة</p></div>
+      <div class="stat-card"><h3 id="statFixed">0</h3><p>أعمال تم إصلاحها</p></div>
+    </div>
+    <div class="grid-stats">
+      <div class="stat-card"><h3 id="statNovels">0</h3><p>فصول روايات</p></div>
+      <div class="stat-card"><h3 id="statActive">0</h3><p>عامل نشط الآن</p></div>
+      <div class="stat-card"><h3 id="statRemaining">0</h3><p>متبقي بالطابور</p></div>
+    </div>
+
+    <h4>📋 سجل التعديلات التفصيلي</h4>
+    <div id="changeLogBox">لسه ماكو تعديلات...</div>
+
+    <h4>🔬 تشخيص رابط (يدور بكل الصفحة عن الكلمات المفتاحية)</h4>
+    <label>رابط مانهوا</label>
+    <input type="text" id="diagUrl" placeholder="https://azorafly.com/series/...">
+    <div class="controls">
+      <button class="btn info" id="diagBtn">🔬 شخّص هذا الرابط</button>
+    </div>
+
+    <h4>📜 سجل عام</h4>
+    <div id="logBox">اضغط أي زر فوق حتى يبدي...</div>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import {
+      getFirestore, collection, addDoc, setDoc, getDoc, doc, updateDoc, deleteDoc, deleteField,
+      query, where, getDocs, serverTimestamp
+    } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyBkaDrsjial5W6xyXPPt1-trJhR7E9n2p4",
+      authDomain: "pure-library-2d45d.firebaseapp.com",
+      projectId: "pure-library-2d45d",
+      storageBucket: "pure-library-2d45d.firebasestorage.app",
+      messagingSenderId: "953898341477",
+      appId: "1:953898341477:web:85409f5597f894ff13e28c"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    // ============================================================
+    // نظام مواقع متعدد — كل موقع إله ملف إعدادات (selectors) خاص فيه.
+    // لإضافة موقع جديد لاحقاً: شخّص رابط منه، شوف شنو انلقط، واملأ
+    // القسم "إضافة موقع جديد" فوق بنفس أسماء الحقول. ما تحتاج مني
+    // أعدل الكود من جديد — النظام مبني حتى يتوسع بروحه.
+    // ============================================================
+    const BUILTIN_PROFILES = {
+      'azorafly.com': {
+        baseUrl: 'https://azorafly.com/series/',
+        listingCard: 'div.page-item-detail',
+        listingLink: 'h3.h5 a, .post-title a',
+        nextPage: 'a.next.page-numbers, .nav-previous a, a[rel="next"]',
+        description: '.summary__content, .description-summary .summary__content, div.manga-summary, #noticeContent p, .post-content_item .summary-content',
+        rating: '.post-total-rating .score, .rating .score, span.total_votes, .score',
+        genres: '.genres-content a, .summary-content .genres a, .genres a, a[href*="/genre/"], a[href*="/genres/"], .tags-content a',
+        status: '.post-status .summary-content, .status, .summary-content .status',
+        pageImage: 'div.reader-area img, div#readerarea img, div.page-break img',
+        textContent: 'div.text-right, div.entry-content p, div#novel-content, div.reading-content p, .text-left, .chapter-content p, #readerarea p',
+      }
+    };
+    const PROFILES_KEY = 'azora12_site_profiles';
+    function loadCustomProfiles() {
+      try { return JSON.parse(localStorage.getItem(PROFILES_KEY) || '{}'); } catch (e) { return {}; }
+    }
+    function saveCustomProfiles(profiles) {
+      localStorage.setItem(PROFILES_KEY, JSON.stringify(profiles));
+    }
+    function getAllProfiles() {
+      return { ...BUILTIN_PROFILES, ...loadCustomProfiles() };
+    }
+    function getActiveProfile() {
+      const key = document.getElementById('siteSelect').value;
+      const all = getAllProfiles();
+      return all[key] || Object.values(all)[0];
+    }
+    function populateSiteSelect() {
+      const sel = document.getElementById('siteSelect');
+      const prev = sel.value;
+      sel.innerHTML = '';
+      const all = getAllProfiles();
+      Object.keys(all).forEach(k => {
+        const opt = document.createElement('option');
+        opt.value = k; opt.textContent = k;
+        sel.appendChild(opt);
+      });
+      if (prev && all[prev]) sel.value = prev;
+    }
+
+    // ============================================================
+    // ذاكرة دائمة (localStorage)
+    // ============================================================
+    const STORE_KEY = 'azora12_state_v1';
+    function loadState() {
+      try { const raw = localStorage.getItem(STORE_KEY); if (raw) return JSON.parse(raw); } catch (e) {}
+      return { mangaCount: 0, chapCount: 0, imgCount: 0, failCount: 0, dupeCount: 0, fixedCount: 0, novelChapCount: 0, changeLog: [], logLines: [] };
+    }
+    function saveState() {
+      try {
+        localStorage.setItem(STORE_KEY, JSON.stringify({
+          mangaCount, chapCount, imgCount, failCount, dupeCount, fixedCount, novelChapCount,
+          changeLog: changeLog.slice(-200), logLines: logLines.slice(-300),
+        }));
+      } catch (e) {}
+    }
+    const saved = loadState();
+    let mangaCount = saved.mangaCount, chapCount = saved.chapCount, imgCount = saved.imgCount,
+        failCount = saved.failCount, dupeCount = saved.dupeCount, fixedCount = saved.fixedCount,
+        novelChapCount = saved.novelChapCount;
+    let changeLog = saved.changeLog || [];
+    let logLines = saved.logLines || [];
+    let REPORT = null; // لما يشتغل الفحص الشامل يتجمع فيه كل سطر حتى ينسخ بضغطة وحدة
+    const processedUrls = new Set();
+    let RUNNING = false;
+    let activeWorkers = 0;
+
+    function renderStats() {
+      document.getElementById('statManga').innerText = mangaCount;
+      document.getElementById('statChaps').innerText = chapCount;
+      document.getElementById('statImgs').innerText = imgCount;
+      document.getElementById('statFailed').innerText = failCount;
+      document.getElementById('statDupes').innerText = dupeCount;
+      document.getElementById('statFixed').innerText = fixedCount;
+      document.getElementById('statNovels').innerText = novelChapCount;
+      document.getElementById('statActive').innerText = activeWorkers;
+    }
+    function printLog(txt) {
+      if (REPORT) REPORT.push(txt);
+      logLines.push(txt);
+      const b = document.getElementById('logBox');
+      b.innerText += "\n> " + txt;
+      b.scrollTop = b.scrollHeight;
+      saveState();
+    }
+    function printChange(txt) {
+      changeLog.push(txt);
+      const b = document.getElementById('changeLogBox');
+      b.innerText = (b.innerText === 'لسه ماكو تعديلات...' ? '' : b.innerText) + "\n" + txt;
+      b.scrollTop = b.scrollHeight;
+      saveState();
+    }
+    function markFailed(reason) {
+      failCount++; renderStats();
+      if (reason) printLog(`  ❌ [فشل]: ${reason}`);
+      saveState();
+    }
+
+    window.addEventListener('load', () => {
+      populateSiteSelect();
+      renderStats();
+      if (logLines.length) document.getElementById('logBox').innerText = logLines.map(l => '> ' + l).join('\n');
+      if (changeLog.length) document.getElementById('changeLogBox').innerText = changeLog.join('\n');
+      document.getElementById('status').innerText = '✅ التطبيق جاهز — الذاكرة السابقة محفوظة ومسترجعة.';
+    });
+
+    async function requestWakeLock() {
+      try { if ('wakeLock' in navigator) await navigator.wakeLock.request('screen'); } catch (e) {}
+    }
+
+    function cleanUrl(url, base) {
+      if (!url) return "";
+      let cleaned = url.trim();
+      const baseHost = (new URL(base || getActiveProfile().baseUrl)).origin;
+      if (cleaned.includes('androidplatform.net')) {
+        cleaned = cleaned.replace(/https?:\/\/appassets\.androidplatform\.net/g, baseHost);
+      }
+      if (cleaned.startsWith("//")) return "https:" + cleaned;
+      if (cleaned.startsWith("/")) return baseHost + cleaned;
+      if (!cleaned.startsWith("http")) return baseHost + "/" + cleaned;
+      return cleaned;
+    }
+
+    function normalizeTitle(t) {
+      if (!t) return "";
+      return t.normalize('NFKC').trim().toLowerCase().replace(/\s+/g, ' ').replace(/[^\w\u0600-\u06FF ]/g, '');
+    }
+    function safeDocId(text) {
+      if (!text) return 'manga_doc';
+      let s = text.normalize('NFKC').trim().toLowerCase();
+      s = s.replace(/[^\w\u0600-\u06FF]+/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '');
+      return (s || 'manga_doc').slice(0, 120);
+    }
+    function cleanChapterNumber(rawText, fallbackIndex) {
+      const text = (rawText || '').trim();
+      const m = text.match(/(\d+(?:\.\d+)?)/);
+      if (m) return m[1];
+      return String(fallbackIndex);
+    }
+    function cleanSeriesTitle(t) {
+      if (!t) return t;
+      return t.replace(/[\s\-–—:]*\(?(?:الفصل|فصل|chapter|ch\.?)\s*\d+(?:\.\d+)?\)?\s*$/i, '').trim();
+    }
+    function sortChaptersByNumber(chapters) {
+      return chapters
+        .map(c => ({ ...c, _num: parseFloat(cleanChapterNumber(c.txt, 0)) || 0 }))
+        .sort((a, b) => a._num - b._num);
+    }
+
+    // اتصال بالبروكسي المحلي — ما انلمس
+    async function fetchViaProxy(targetUrl) {
+      const safeUrlV = cleanUrl(targetUrl);
+      const proxyEndpoint = `http://127.0.0.1:8080/?url=${encodeURIComponent(safeUrlV)}`;
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 20000); // 20 ثانية أقصى انتظار للبروكسي
+      try {
+        const res = await fetch(proxyEndpoint, { cache: "no-store", signal: controller.signal });
+        clearTimeout(timeoutId);
+        if (res.ok) {
+          const html = await res.text();
+          if (html && html.length > 200 && !html.includes("Error fetching site")) {
+            return { doc: new DOMParser().parseFromString(html, 'text/html'), raw: html };
+          }
+        }
+      } catch (e) {
+        clearTimeout(timeoutId);
+        if (e.name === 'AbortError') throw new Error("⏱️ البروكسي ما رد خلال 20 ثانية (علّق أو الموقع بطيء).");
+      }
+      throw new Error("فشل الاتصال بالبروكسي بالخلفية.");
+    }
+
+    // ============================================================
+    // استخراج البيانات — حسب ملف الموقع النشط (getActiveProfile)
+    // ============================================================
+    function stripHtmlTags(s) {
+      if (!s) return '';
+      return s.replace(/<\/?[a-z][^>]*>/gi, ' ').replace(/\s+/g, ' ').trim();
+    }
+    // ============================================================
+    // نظام قراءة "جزر Astro" — كل مكون بالصفحة (تقييم، تصنيفات،
+    // حالة...) يخزن بياناته الحقيقية بخاصية "props" على وسم
+    // <astro-island>. هذا يقرا كل الجزر، ويدور تلقائياً بداخل كل
+    // وحدة عن أي مفتاح اسمه يشبه اللي نريده — بدل الاعتماد على اسم
+    // جزيرة وحدة بس (لو الموقع تغيّر شوي، النظام لسه يلكطها).
+    // ============================================================
+    function decodeHtmlEntities(s) {
+      return s.replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+    }
+    function unwrapDevalue(v) {
+      // Astro يخزن كل قيمة كـ [نوع, القيمة الحقيقية] — هذا يفك التغليف
+      if (Array.isArray(v) && v.length === 2 && typeof v[0] === 'number') return v[1];
+      return v;
+    }
+    function extractAstroIslands(raw) {
+      const results = {};
+      const tagRe = /<astro-island\b[^>]*?\bprops="([^"]*)"[^>]*?\bopts="([^"]*)"[^>]*>/g;
+      let m;
+      while ((m = tagRe.exec(raw)) !== null) {
+        try {
+          const optsObj = JSON.parse(decodeHtmlEntities(m[2]));
+          const name = optsObj && optsObj.name;
+          if (!name) continue;
+          const propsObj = JSON.parse(decodeHtmlEntities(m[1]));
+          results[name] = propsObj;
+        } catch (e) { /* جزيرة وحدة فشل تحليلها، نكمل بالباقي */ }
+      }
+      return results;
+    }
+    function deepFindValue(obj, keyPattern, wantArray = false) {
+      if (obj == null || typeof obj !== 'object') return null;
+      if (Array.isArray(obj)) {
+        for (const item of obj) { const r = deepFindValue(item, keyPattern, wantArray); if (r !== null) return r; }
+        return null;
+      }
+      for (const [k, v] of Object.entries(obj)) {
+        if (keyPattern.test(k)) {
+          const val = unwrapDevalue(v);
+          if (wantArray && Array.isArray(val)) {
+            const flat = val.map(x => (Array.isArray(x) ? unwrapDevalue(x) : x)).filter(x => typeof x === 'string');
+            if (flat.length) return flat;
+          } else if (!wantArray && val !== null && typeof val !== 'object') {
+            return val;
+          }
+        }
+      }
+      for (const v of Object.values(obj)) { const r = deepFindValue(v, keyPattern, wantArray); if (r !== null) return r; }
+      return null;
+    }
+    function findAcrossIslands(islands, keyPattern, wantArray = false, preferIsland = null) {
+      if (preferIsland && islands[preferIsland]) {
+        const r = deepFindValue(islands[preferIsland], keyPattern, wantArray);
+        if (r !== null) return r;
+      }
+      for (const name of Object.keys(islands)) {
+        const r = deepFindValue(islands[name], keyPattern, wantArray);
+        if (r !== null) return r;
+      }
+      return null;
+    }
+    function extractJsonLdGraph(raw) {
+      const blocks = [];
+      const re = /<script type="application\/ld\+json">([\s\S]*?)<\/script>/g;
+      let m;
+      while ((m = re.exec(raw)) !== null) {
+        try { blocks.push(JSON.parse(m[1])); } catch (e) {}
+      }
+      return blocks;
+    }
+    function extractDescription(mDoc, raw) {
+      // مؤكد يشتغل: meta description / og:description (شفناها بالتشخيص)
+      const metaDesc = mDoc.querySelector('meta[property="og:description"]')?.content ||
+                        mDoc.querySelector('meta[name="description"]')?.content || '';
+      if (metaDesc) return stripHtmlTags(metaDesc);
+      // احتياط: لو الموقع النشط عنده سيلكتور مخصص بالجسم
+      const el = mDoc.querySelector(getActiveProfile().description || '');
+      return el ? el.textContent.trim() : '';
+    }
+    function extractRating(mDoc, raw) {
+      if (raw) {
+        const islands = extractAstroIslands(raw);
+        const fromIsland = findAcrossIslands(islands, /^(average)?rating$/i, false, 'SeriesSummaryStatsIsland');
+        if (typeof fromIsland === 'number') return fromIsland;
+        if (typeof fromIsland === 'string') { const n = parseFloat(fromIsland); if (!isNaN(n)) return n; }
+        for (const block of extractJsonLdGraph(raw)) {
+          const nodes = block['@graph'] || [block];
+          for (const node of nodes) {
+            const ar = node.aggregateRating;
+            if (ar && ar.ratingValue) { const n = parseFloat(ar.ratingValue); if (!isNaN(n)) return n; }
+          }
+        }
+      }
+      const el = mDoc.querySelector(getActiveProfile().rating || '');
+      if (!el) return null;
+      const num = parseFloat(el.textContent.replace(',', '.').match(/[\d.]+/)?.[0]);
+      return isNaN(num) ? null : num;
+    }
+    function extractGenres(mDoc, raw) {
+      if (raw) {
+        const islands = extractAstroIslands(raw);
+        const fromIsland = findAcrossIslands(islands, /genres?$/i, true);
+        if (Array.isArray(fromIsland) && fromIsland.length) return fromIsland;
+        for (const block of extractJsonLdGraph(raw)) {
+          const nodes = block['@graph'] || [block];
+          for (const node of nodes) {
+            if (Array.isArray(node.genre) && node.genre.length) return node.genre;
+            if (typeof node.genre === 'string') return [node.genre];
+          }
+        }
+      }
+      const selEl = mDoc.querySelectorAll(getActiveProfile().genres || '');
+      const set = new Set();
+      const seenNorm = new Set();
+      function addGenre(t) {
+        if (!t) return;
+        const norm = t.normalize('NFKC').replace(/[إأآا]/g, 'ا').toLowerCase().trim();
+        if (seenNorm.has(norm)) return;
+        seenNorm.add(norm);
+        set.add(t.trim());
+      }
+      selEl.forEach(a => addGenre(a.textContent.trim()));
+      if (set.size) return [...set];
+      // آخر حل بدون AI ولا حساب: أي رابط بالصفحة رابطه فيه ?genres= أو /genre/
+      // (نفس نمط روابط التصنيفات اللي شفناها بقائمة الموقع)
+      Array.from(mDoc.querySelectorAll('a')).forEach(a => {
+        const href = a.getAttribute('href') || '';
+        if (/[?&]genres?=/i.test(href) || /\/genres?\//i.test(href)) {
+          const t = a.textContent.trim();
+          if (t && t.length < 30) addGenre(t);
+        }
+      });
+      return [...set];
+    }
+    function extractStatus(mDoc, raw) {
+      if (raw) {
+        const islands = extractAstroIslands(raw);
+        const fromIsland = findAcrossIslands(islands, /^(series)?status$/i, false);
+        if (typeof fromIsland === 'string' && fromIsland) return fromIsland;
+        for (const block of extractJsonLdGraph(raw)) {
+          const nodes = block['@graph'] || [block];
+          for (const node of nodes) {
+            if (typeof node.status === 'string') return node.status;
+            if (typeof node.creativeWorkStatus === 'string') return node.creativeWorkStatus;
+          }
+        }
+      }
+      const el = mDoc.querySelector(getActiveProfile().status || '');
+      return el ? el.textContent.trim() : '';
+    }
+    function extractChapterCountHint(raw) {
+      if (!raw) return null;
+      const islands = extractAstroIslands(raw);
+      const v = findAcrossIslands(islands, /^chapterscount$/i, false, 'SeriesTabsNavIsland');
+      return typeof v === 'number' ? v : null;
+    }
+    // روابط الفصول: أول شي نطلب النمط الصارم .../series/<اسم>/chapter-<رقم> (وبنفس المانهوا بس)،
+    // وإذا ما لكينا نرجع للطريقة الواسعة القديمة. الرقم ياخذ من الرابط نفسه (أضمن من نص الرابط).
+    function extractChapterLinks(mDoc, seriesUrl) {
+      const anchors = Array.from(mDoc.querySelectorAll('a'));
+      const all = anchors
+        .map(a => ({ url: cleanUrl(a.getAttribute('href') || a.href), txt: a.innerText.trim() }))
+        .filter(c => c.url);
+
+      const strictRe = /\/chapter-(\d+(?:[.\-]\d+)?)\/?$/i;
+      const stripUrl = u => u.replace(/[?#].*$/, '').replace(/\/$/, '');
+      let strict = all.filter(c => strictRe.test(stripUrl(c.url)));
+      if (seriesUrl) {
+        const base = stripUrl(cleanUrl(seriesUrl)).toLowerCase();
+        const same = strict.filter(c => stripUrl(c.url).toLowerCase().startsWith(base + '/'));
+        if (same.length) strict = same;
+      }
+      if (strict.length) {
+        const seen = new Set(); const out = [];
+        strict.forEach(c => {
+          const key = stripUrl(c.url);
+          if (seen.has(key)) return;
+          seen.add(key);
+          out.push({ url: key, txt: key.match(strictRe)[1].replace('-', '.') });
+        });
+        return out;
+      }
+
+      // احتياط: الطريقة الواسعة (لمواقع ثانية)
+      const candidates = all.filter(c => (
+        c.url.includes('chapter') || c.url.includes('/ch-') || c.url.includes('/ep-') ||
+        c.url.includes('episode') || /\/\d+\/?$/.test(c.url.replace(/\/$/, '')) ||
+        c.txt.includes('فصل') || /^\d+(\.\d+)?$/.test(c.txt)
+      ));
+      const unique = []; const seen = new Set();
+      candidates.forEach(c => { if (!seen.has(c.url)) { seen.add(c.url); unique.push(c); } });
+      return unique;
+    }
+    // ============================================================
+    // محتوى الفصل: صور (مانهوا) أو نص (رواية). الموقع مبني بـ Astro، فالصور
+    // غالباً مخبية بـ props الجزر مو بوسوم <img> عادية — لهذا نجرب أكثر من طريقة
+    // بالترتيب: (1) الجزر  (2) سيلكتورات/وسوم img  (3) بحث بكل الـ HTML الخام.
+    // ============================================================
+    const IMG_URL_RE = /https?:\/\/[^\s"'\\<>()]+?\.(?:jpe?g|png|webp|avif)(?:\?[^\s"'\\<>()]*)?/gi;
+    const IMG_EXCLUDE_RE = /avatar|featured|logo|banner|favicon|emoji|sprite|placeholder|\/icons?\//i;
+
+    function collectImageUrls(text, excludeUrl) {
+      const out = []; const seen = new Set();
+      if (!text) return out;
+      const decoded = text.replace(/&quot;/g, '"').replace(/&amp;/g, '&').replace(/\\\//g, '/');
+      const re = new RegExp(IMG_URL_RE.source, 'gi');
+      let m;
+      while ((m = re.exec(decoded)) !== null) {
+        const u = m[0];
+        if (seen.has(u)) continue;
+        seen.add(u);
+        if (excludeUrl && u === excludeUrl) continue;
+        if (IMG_EXCLUDE_RE.test(u)) continue;
+        out.push(u);
+      }
+      return out;
+    }
+    // صور الفصل عادةً كلها بنفس المجلد — نختار أكبر مجموعة بنفس المجلد حتى نتخلص من صور جانبية (أفاتار، مقترحات)
+    function pickMainImageGroup(urls) {
+      if (urls.length <= 2) return urls;
+      const dirOf = u => u.replace(/[?#].*$/, '').replace(/\/[^\/]*$/, '');
+      const counts = new Map();
+      urls.forEach(u => { const d = dirOf(u); counts.set(d, (counts.get(d) || 0) + 1); });
+      let bestDir = null, best = 0;
+      counts.forEach((n, d) => { if (n > best) { best = n; bestDir = d; } });
+      return best >= 2 ? urls.filter(u => dirOf(u) === bestDir) : urls;
+    }
+    function extractImagesFromIslands(raw, coverUrl) {
+      const islands = extractAstroIslands(raw);
+      let best = [];
+      for (const name of Object.keys(islands)) {
+        const urls = collectImageUrls(JSON.stringify(islands[name]), coverUrl);
+        if (urls.length > best.length) best = urls;
+      }
+      return pickMainImageGroup(best);
+    }
+    function htmlToParagraphs(html) {
+      const t = html.replace(/<\/(p|div|h[1-6]|li)>|<br\s*\/?>/gi, '\n').replace(/<[^>]+>/g, '');
+      return t.split(/\n+/).map(x => x.replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim()).filter(Boolean);
+    }
+    // نص الرواية: أطول نص بالجزر يكون فعلاً نص (مو svg ولا رابط)
+    function extractNovelParagraphsFromIslands(raw) {
+      const islands = extractAstroIslands(raw);
+      let bestParas = []; let bestLen = 0;
+      const walk = (v) => {
+        if (typeof v === 'string') {
+          if (v.length < 300 || /^\s*<svg/i.test(v)) return;
+          const paras = htmlToParagraphs(v);
+          const plain = paras.join(' ');
+          const letters = (plain.match(/[A-Za-z\u0600-\u06FF]/g) || []).length;
+          if (plain.length > 300 && letters / plain.length > 0.6 && plain.length > bestLen) {
+            bestLen = plain.length; bestParas = paras;
+          }
+          return;
+        }
+        if (Array.isArray(v)) { v.forEach(walk); return; }
+        if (v && typeof v === 'object') Object.values(v).forEach(walk);
+      };
+      Object.keys(islands).forEach(n => walk(islands[n]));
+      return bestParas;
+    }
+
+    async function extractChapterContent(chDoc, raw) {
+      const profile = getActiveProfile();
+      const coverUrl = chDoc.querySelector('meta[property="og:image"]')?.content || '';
+
+      // (1) الجزر
+      let images = raw ? extractImagesFromIslands(raw, coverUrl) : [];
+      const novelParas = raw ? extractNovelParagraphsFromIslands(raw) : [];
+      if (novelParas.length && images.length < 3) {
+        return { isNovel: true, images: [], content: novelParas.join('\n\n') };
+      }
+      if (images.length > 0) return { isNovel: false, images, content: '' };
+
+      // (2) وسوم img بالصفحة (سيلكتور الموقع أول، بعدين أي img)
+      const grab = (sel) => Array.from(chDoc.querySelectorAll(sel))
+        .map(img => img.getAttribute('data-src') || img.getAttribute('data-lazy-src') || img.getAttribute('lazy-src') || img.getAttribute('src') || '')
+        .filter(Boolean).map(u => cleanUrl(u));
+      const isImg = u => /\.(jpe?g|png|webp|avif)(\?|$)/i.test(u) && !IMG_EXCLUDE_RE.test(u) && u !== coverUrl;
+      let domImgs = [...new Set(grab(profile.pageImage || 'img').filter(isImg))];
+      if (!domImgs.length) domImgs = [...new Set(grab('img').filter(isImg))];
+      domImgs = pickMainImageGroup(domImgs);
+      if (domImgs.length > 0) return { isNovel: false, images: domImgs, content: '' };
+
+      // نص رواية بوسوم عادية
+      const paragraphs = [];
+      chDoc.querySelectorAll(profile.textContent || 'p').forEach(p => { const t = p.textContent.trim(); if (t) paragraphs.push(t); });
+      const content = paragraphs.join('\n\n').trim();
+      if (content.length > 300) return { isNovel: true, images: [], content };
+
+      // (3) آخر حل: أي رابط صورة بالـ HTML الخام كله
+      if (raw) {
+        const rawImgs = pickMainImageGroup(collectImageUrls(raw, coverUrl));
+        if (rawImgs.length >= 2) return { isNovel: false, images: rawImgs, content: '' };
+      }
+      return { isNovel: false, images: [], content: '' };
+    }
+
+    // ============================================================
+    // 🔬 تشخيص متقدم — يدور بكل الصفحة (مو أول 400 حرف بس) عن كلمات
+    // مفتاحية، وكمان يجرب يفتح ملف الجافاسكربت الرئيسي ويدور فيه عن
+    // رابط API — هذا أهم شي لو الموقع يسحب بياناته بجافاسكربت
+    // ============================================================
+    const DIAG_KEYWORDS = [
+      'genre', 'تصنيف', 'rating', 'score', 'تقييم', 'summary', 'description',
+      'قصة', 'وصف', 'status', 'حالة', 'synopsis',
+    ];
+    function findContext(raw, keyword, maxHits = 2, windowSize = 160) {
+      const results = [];
+      const lower = raw.toLowerCase();
+      let idx = lower.indexOf(keyword.toLowerCase());
+      let hits = 0;
+      while (idx !== -1 && hits < maxHits) {
+        const start = Math.max(0, idx - Math.floor(windowSize * 0.3));
+        const end = Math.min(raw.length, idx + keyword.length + Math.floor(windowSize * 0.7));
+        results.push(raw.slice(start, end).replace(/\s+/g, ' '));
+        hits++;
+        idx = lower.indexOf(keyword.toLowerCase(), idx + keyword.length);
+      }
+      return results;
+    }
+
+    // تشخيص فصل: ملخص قصير (مو سجل ضخم) يوريك شنو لكط الكود بصفحة الفصل
+    async function diagnoseChapter(url, chDoc, raw) {
+      printLog(`  📖 هذا رابط فصل — تشخيص مخصص للفصول:`);
+      printLog(`  📄 حجم HTML: ${raw.length} حرف`);
+      const islands = extractAstroIslands(raw);
+      const names = Object.keys(islands);
+      printLog(`  🏝️ عدد الجزر: ${names.length}`);
+      const coverUrl = chDoc.querySelector('meta[property="og:image"]')?.content || '';
+      names.forEach(n => {
+        const keys = Object.keys(islands[n] || {}).slice(0, 8).join('، ');
+        const imgs = collectImageUrls(JSON.stringify(islands[n]), coverUrl).length;
+        if (imgs > 0 || /chapter|reader|page|image|content|novel/i.test(n)) {
+          printLog(`     • ${n} — صور: ${imgs} — مفاتيح: ${keys}`);
+        }
+      });
+      const imgTags = Array.from(chDoc.querySelectorAll('img'));
+      printLog(`  🖼️ وسوم <img> بالصفحة: ${imgTags.length}`);
+      imgTags.slice(0, 3).forEach(i => printLog(`     ${(i.getAttribute('data-src') || i.getAttribute('src') || '').slice(0, 110)}`));
+      const rawImgs = collectImageUrls(raw, coverUrl);
+      printLog(`  🔗 روابط صور بالـ HTML الخام: ${rawImgs.length}`);
+      rawImgs.slice(0, 3).forEach(u => printLog(`     ${u.slice(0, 110)}`));
+
+      const res = await extractChapterContent(chDoc, raw);
+      printLog(`  ✅ نتيجة الاستخراج: ${res.isNovel ? 'رواية (نص)' : 'مانهوا (صور)'} — صور: ${res.images.length} — حروف نص: ${res.content.length}`);
+      res.images.slice(0, 2).forEach(u => printLog(`     ${u.slice(0, 110)}`));
+      if (res.content) printLog(`     ${res.content.slice(0, 120)}...`);
+
+      // مؤشرات قفل/شراء (فصول مدفوعة ما تنزل محتواها)
+      const lockKeys = [];
+      const walk = (v, path) => {
+        if (v && typeof v === 'object') {
+          Object.entries(v).forEach(([k, val]) => {
+            if (/lock|premium|price|coin|paid|purchase|subscribe/i.test(k)) {
+              const u = unwrapDevalue(val);
+              if (typeof u !== 'object') lockKeys.push(`${k}=${String(u).slice(0, 30)}`);
+            }
+            walk(val, path + '.' + k);
+          });
+        }
+      };
+      names.forEach(n => walk(islands[n], n));
+      if (lockKeys.length) printLog(`  🔒 مفاتيح قفل/شراء: ${[...new Set(lockKeys)].slice(0, 8).join(' | ')}`);
+      if (res.images.length === 0 && !res.content) {
+        printLog(`  ⚠️ ما انلقط شي. ابعثلي هذا السجل كامل (هو قصير) وأعرف وين مخبي المحتوى.`);
+      }
+    }
+
+    async function diagnoseUrl() {
+      const url = document.getElementById('diagUrl').value.trim();
+      if (!url) { printLog('❌ حط رابط أول.'); return; }
+      printLog(`🔬 يشخّص: ${url}`);
+      try {
+        const { doc: mDoc, raw } = await fetchViaProxy(url);
+        if (/\/chapter-[\d.\-]+\/?$/i.test(url.replace(/[?#].*$/, ''))) { diagnoseChapter(url, mDoc, raw); return; }
+        const title = cleanSeriesTitle(mDoc.querySelector('meta[property="og:title"]')?.content || mDoc.title || '(ماكو عنوان)');
+        const desc = extractDescription(mDoc, raw);
+        const rating = extractRating(mDoc, raw);
+        const genres = extractGenres(mDoc, raw);
+        const status = extractStatus(mDoc, raw);
+        const chapterCountHint = extractChapterCountHint(raw);
+        const chapters = extractChapterLinks(mDoc, url);
+
+        printLog(`  📌 العنوان: ${title}`);
+        printLog(`  📖 القصة (بالسيلكتور الحالي): ${desc ? `وجدت (${desc.length} حرف)` : '❌ ماكو'}`);
+        printLog(`  ⭐ التقييم (بالسيلكتور الحالي): ${rating !== null ? rating : '❌ ماكو'}`);
+        printLog(`  🏷️ التصنيفات (بالسيلكتور الحالي): ${genres.length ? genres.join('، ') : '❌ ماكو'}`);
+        printLog(`  📊 الحالة (بالسيلكتور الحالي): ${status || '❌ ماكو'}`);
+        printLog(`  📚 عدد الفصول الملقوطة (بالروابط): ${chapters.length}${chapterCountHint !== null ? ` | العدد الحقيقي من بيانات الصفحة: ${chapterCountHint}` : ''}`);
+        printLog(`  📄 حجم HTML الخام: ${raw.length} حرف`);
+
+        printLog(`\n  📦 محتوى JSON-LD كامل (schema.org) — نشوف فيه إذا اكو حقل genre:`);
+        const ldBlocks = extractJsonLdGraph(raw);
+        if (ldBlocks.length === 0) {
+          printLog(`   ⚠️ ماكو أي JSON-LD بالصفحة.`);
+        } else {
+          ldBlocks.forEach((block, i) => {
+            const asText = JSON.stringify(block);
+            printLog(`   [كتلة ${i + 1}] (${asText.length} حرف):`);
+            printLog(`   ${asText.slice(0, 1500)}${asText.length > 1500 ? ' ...(مقطوع)' : ''}`);
+          });
+        }
+
+        printLog(`\n  🔍 بحث عن كلمات مفتاحية بكل الصفحة (مو بس أول 400 حرف):`);
+        let anyFound = false;
+        for (const kw of DIAG_KEYWORDS) {
+          const hits = findContext(raw, kw);
+          if (hits.length) {
+            anyFound = true;
+            printLog(`   ✅ "${kw}" (${hits.length} مكان):`);
+            hits.forEach(h => printLog(`      ...${h}...`));
+          }
+        }
+        if (!anyFound) {
+          printLog(`   ⚠️ ما لكيت ولا كلمة من الكلمات المفتاحية بكل الصفحة.`);
+        }
+
+        // الموقع مبني بـ Astro (شفنا astro-view-transitions) — Astro
+        // غالباً يخزن بيانات كل صفحة جوا خاصية "props" بوسم
+        // <astro-island>. هذا أرجح مكان توكد فيه البيانات الحقيقية.
+        printLog(`\n  🏝️ بحث عن astro-island (مكان تخزين بيانات الصفحة بمواقع Astro):`);
+        const islandHits = findContext(raw, '<astro-island uid=', 15, 900);
+        if (islandHits.length) {
+          islandHits.forEach(h => printLog(`      ...${h}...`));
+        } else {
+          printLog(`   ⚠️ ماكو astro-island بهذي الصفحة.`);
+        }
+
+        // نبحث عن كل مكان يتكرر فيه عنوان المانهوا نفسه — غالباً
+        // يكون جوا الكتلة اللي فيها بقية بيانات نفس المانهوا (تقييم، تصنيف)
+        if (title && title !== '(ماكو عنوان)') {
+          printLog(`\n  🎯 بحث عن كل مكان يتكرر فيه اسم "${title}" بالصفحة (يمكن يكون جنبه بيانات ثانية):`);
+          const titleHits = findContext(raw, title, 6, 350);
+          titleHits.forEach((h, i) => printLog(`      [${i + 1}] ...${h}...`));
+        }
+
+        // نحاول نلكط ملف الجافاسكربت الرئيسي ونشوف فيه رابط API
+        const scriptMatch = raw.match(/<script[^>]+type=["']module["'][^>]+src=["']([^"']+)["']/i) ||
+                             raw.match(/<script[^>]+src=["']([^"']+\.js)["']/i);
+        if (scriptMatch) {
+          const jsUrl = cleanUrl(scriptMatch[1], url);
+          printLog(`\n  📦 لكيت ملف جافاسكربت رئيسي: ${jsUrl}`);
+          try {
+            const { raw: jsRaw } = await fetchViaProxy(jsUrl);
+            printLog(`  📦 حجم ملف الجافاسكربت: ${jsRaw.length} حرف — يدور فيه عن رابط API...`);
+            const apiHits = findContext(jsRaw, '/api/', 3).concat(findContext(jsRaw, '.json', 2));
+            if (apiHits.length) {
+              printLog(`   ✅ لكيت احتمال رابط API:`);
+              apiHits.forEach(h => printLog(`      ...${h}...`));
+              printLog(`   💡 إذا طلع رابط واضح هنا (مثل /api/series/...)، ابعثه لي — نقدر نسحب البيانات منه مباشرة بدل تخمين HTML.`);
+            } else {
+              printLog(`   ⚠️ ما لكيت رابط API واضح بملف الجافاسكربت (ممكن يكون بملف ثاني مرتبط فيه).`);
+            }
+          } catch (e) {
+            printLog(`   ❌ فشل جلب ملف الجافاسكربت: ${e.message}`);
+          }
+        }
+
+        printLog(`\n  💡 انسخ سجل التشخيص هذا كامل وابعثه لي — بيه كل المعلومة الي أحتاجها.`);
+      } catch (e) {
+        printLog(`  ❌ فشل التشخيص: ${e.message}`);
+      }
+    }
+
+    // ============================================================
+    // معالجة مانهوا وحدة
+    // ============================================================
+    // ============================================================
+    // حماية من التعليق الصامت: أي خطوة تحطها هنا لازم تخلص خلال
+    // مدة محددة، وإلا ترمي خطأ واضح بدل ما تعلّق للأبد بصمت
+    // ============================================================
+    function withTimeout(promise, ms, label) {
+      return Promise.race([
+        promise,
+        new Promise((_, reject) => setTimeout(() => reject(new Error(`⏱️ انتهت المهلة (${label}) بعد ${ms / 1000} ثانية — يمكن مشكلة اتصال بقاعدة البيانات`)), ms)),
+      ]);
+    }
+
+    async function processSingleManga(mUrl) {
+      if (processedUrls.has(mUrl)) return;
+      processedUrls.add(mUrl);
+      printLog(`  ▶️ بدء معالجة: ${mUrl}`);
+
+      try {
+        const { doc: mDoc, raw } = await fetchViaProxy(mUrl);
+        const title = cleanSeriesTitle(mDoc.querySelector('meta[property="og:title"]')?.content || mDoc.title || "عمل أزورا");
+        const slug = safeDocId(title);
+        const docRef = doc(db, "manhwa", slug);
+
+        printLog(`  🔎 يتأكد إذا موجودة بقاعدة البيانات...`);
+        const existing = await withTimeout(getDoc(docRef), 15000, 'فحص وجود المانهوا');
+        // موجودة → ما نكرر المعلومات، بس نكمل الفصول الناقصة (أو الفاضية) إذا اكو
+        const existingUrls = new Set();
+        if (existing.exists()) {
+          const chSnap = await withTimeout(getDocs(collection(db, `manhwa/${slug}/chapters`)), 15000, 'فحص فصول موجودة');
+          chSnap.docs.forEach(d => { const c = d.data(); if ((c.images && c.images.length) || c.content) existingUrls.add(c.sourceUrl); });
+          printLog(`  ♻️ موجودة (${existingUrls.size} فصل مكتمل) — يكمل الناقص بس: ${title}`);
+        } else {
+          const cover = cleanUrl(mDoc.querySelector('meta[property="og:image"]')?.content || "");
+          const description = extractDescription(mDoc, raw);
+          const rating = extractRating(mDoc, raw);
+          const genres = extractGenres(mDoc, raw);
+          const status = extractStatus(mDoc, raw);
+
+          printLog(`  💾 يكتب البيانات بقاعدة البيانات...`);
+          await withTimeout(setDoc(docRef, {
+            title, titleNormalized: normalizeTitle(title),
+            cover, coverUrl: cover, image: cover,
+            description, rating, genres,
+            sourceUrl: mUrl, sourceSite: (new URL(mUrl)).hostname, type: "مانهوا",
+            status: status || "غير معروف",
+            createdAt: serverTimestamp(), updatedAt: serverTimestamp()
+          }), 15000, 'كتابة بيانات المانهوا');
+
+          mangaCount++; renderStats(); saveState();
+          printLog(`  ✨ [رفع جديد]: ${title} (${slug})`);
+          printChange(`📗 ${title}: عمل جديد — تقييم ${rating ?? '؟'}، ${genres.length} تصنيف، حالة "${status || '؟'}"`);
+        }
+
+        const uniqueChaps = sortChaptersByNumber(extractChapterLinks(mDoc, mUrl));
+        const pendingCount = uniqueChaps.filter(c => !existingUrls.has(c.url)).length;
+        if (pendingCount === 0) {
+          printLog(`  ✅ كل الفصول (${uniqueChaps.length}) موجودة أصلاً — ما أحتاج أسحب شي.`);
+          return;
+        }
+        printLog(`  📚 لكيت ${uniqueChaps.length} فصل، منهم ${pendingCount} ناقص — يبدي يسحبهم...`);
+        let addedChaps = 0;
+        for (let j = 0; j < uniqueChaps.length; j++) {
+          if (!RUNNING) break;
+          const ch = uniqueChaps[j];
+          if (existingUrls.has(ch.url)) continue;
+          const chNum = cleanChapterNumber(ch.txt, j + 1);
+          const correctOrder = j + 1;
+          try {
+            const { doc: chDoc, raw: chRaw } = await fetchViaProxy(ch.url);
+            const { isNovel, images, content } = await extractChapterContent(chDoc, chRaw);
+            if (images.length > 0 || content.length > 0) {
+              await setDoc(doc(db, `manhwa/${slug}/chapters`, chNum), {
+                number: parseFloat(chNum) || correctOrder,
+                sourceUrl: ch.url, isNovel, images, content, order: correctOrder
+              });
+              chapCount++; addedChaps++;
+              if (isNovel) novelChapCount++;
+              imgCount += images.length;
+              renderStats(); saveState();
+              printLog(`     ✅ فصل ${chNum}: ${isNovel ? 'نص ' + content.length + ' حرف' : images.length + ' صورة'}`);
+            } else {
+              markFailed(`فصل بدون محتوى: ${ch.url} (جرب 🩺 الفحص الشامل)`);
+            }
+          } catch (chErr) { markFailed(`فصل: ${ch.url} — ${chErr.message}`); }
+        }
+        printChange(`   ↳ ${title}: انسحب ${addedChaps} فصل جديد (من ${uniqueChaps.length} مكتشف)`);
+      } catch (err) {
+        markFailed(`عمل: ${mUrl} — ${err.message}`);
+      }
+    }
+
+    // ============================================================
+    // نظام عمال حقيقي: طابور مشترك + قفل
+    // ============================================================
+    async function runWorkerPool(items, handler, label) {
+      const queue = [...items];
+      const inProgress = new Set();
+      document.getElementById('statRemaining').innerText = queue.length;
+      const N = Math.max(1, parseInt(document.getElementById('workerCount').value, 10) || 50);
+
+      async function worker() {
+        while (RUNNING) {
+          const item = queue.shift();
+          if (!item) break;
+          const key = typeof item === 'string' ? item : (item.id || item.url || JSON.stringify(item));
+          if (inProgress.has(key)) continue;
+          inProgress.add(key);
+          activeWorkers++; renderStats();
+          try { await handler(item); }
+          catch (e) { markFailed(`${label}: ${e.message}`); }
+          finally {
+            inProgress.delete(key);
+            activeWorkers--;
+            document.getElementById('statRemaining').innerText = queue.length;
+            renderStats();
+          }
+        }
+      }
+      const workers = [];
+      for (let i = 0; i < Math.min(N, items.length || 1); i++) workers.push(worker());
+      await Promise.all(workers);
+    }
+
+    function setBusyUI(busy) {
+      document.getElementById('startBtn').disabled = busy;
+      document.getElementById('fixBtn').disabled = busy;
+      document.getElementById('newChapBtn').disabled = busy;
+      document.getElementById('manualScrapeBtn').disabled = busy;
+      document.getElementById('selfTestBtn').disabled = busy;
+      document.getElementById('stopBtn').disabled = !busy;
+    }
+
+    // سحب أرشيف كامل — يبدي من "نقطة البداية" المحددة لو موجودة
+    // روابط المانهوا من صفحة الأرشيف: (1) سيلكتور الموقع إذا موجود (2) أي رابط بنمط /series/<اسم> (3) slug من props الجزر
+    function extractSeriesLinks(doc, raw, pageUrl, profile) {
+      const origin = new URL(cleanUrl(profile.baseUrl)).origin;
+      const out = []; const seen = new Set();
+      const add = (u) => { const k = u.replace(/[?#].*$/, '').replace(/\/$/, ''); if (!seen.has(k)) { seen.add(k); out.push(k); } };
+      if (profile.listingCard && profile.listingLink) {
+        try {
+          doc.querySelectorAll(profile.listingCard).forEach(card => {
+            const a = card.querySelector(profile.listingLink);
+            if (a) add(cleanUrl(a.getAttribute('href') || a.href));
+          });
+        } catch (e) {}
+      }
+      if (!out.length) {
+        doc.querySelectorAll('a').forEach(a => {
+          const href = a.getAttribute('href') || '';
+          let path = href;
+          try { path = new URL(href, origin).pathname; } catch (e) {}
+          const m = path.match(/^\/series\/([^\/?#]+)\/?$/i);
+          if (m && !/^(page|genres?)$/i.test(m[1])) add(origin + '/series/' + m[1]);
+        });
+      }
+      if (!out.length && raw) {
+        const decoded = raw.replace(/&quot;/g, '"');
+        const re = /"slug":\[0,"([^"\/]+)"\]/g; let m;
+        while ((m = re.exec(decoded)) !== null) { if (!/^chapter-/i.test(m[1])) add(origin + '/series/' + m[1]); }
+      }
+      return out;
+    }
+    // الصفحة التالية: رابط "التالي" إذا موجود، وإلا نجرب ?page=N+1 (يتوقف تلقائياً لما ما يلكي أعمال جديدة)
+    function findNextPageUrl(doc, currentUrl, pageNum, profile) {
+      let el = null;
+      try { el = doc.querySelector(profile.nextPage || 'a[rel="next"]'); } catch (e) {}
+      if (!el) el = doc.querySelector('a[rel="next"]');
+      if (!el) {
+        el = Array.from(doc.querySelectorAll('a')).find(a =>
+          /التالي|next|›|»/i.test((a.getAttribute('aria-label') || '') + ' ' + a.textContent) &&
+          /[?&]page=\d+|\/page\/\d+/i.test(a.getAttribute('href') || ''));
+      }
+      if (el) return cleanUrl(el.getAttribute('href') || el.href);
+      const u = new URL(cleanUrl(currentUrl));
+      u.searchParams.set('page', String(pageNum + 1));
+      return u.toString();
+    }
+
+    async function startArchiveScraping() {
+      RUNNING = true; setBusyUI(true);
+      document.getElementById('status').innerText = "🚀 السحب شغال...";
+      await requestWakeLock();
+
+      const profile = getActiveProfile();
+      const customStart = document.getElementById('startFromUrl').value.trim();
+      let pageUrl = customStart || profile.baseUrl;
+      printLog(`📁 بدء مسح الأرشيف من: ${pageUrl}`);
+
+      const seenPages = new Set();
+      let pageNum = 0;
+
+      while (RUNNING && pageNum < 500) {
+        pageNum++;
+        if (!pageUrl || seenPages.has(pageUrl)) { printLog('  🏁 اكتمل السحب.'); break; }
+        seenPages.add(pageUrl);
+        try {
+          const { doc: pDoc, raw: pRaw } = await fetchViaProxy(pageUrl);
+          const all = extractSeriesLinks(pDoc, pRaw, pageUrl, profile);
+          const mangaList = all.filter(url => url && !processedUrls.has(url));
+
+          if (mangaList.length === 0) { printLog(`  🏁 اكتمل السحب — الصفحة ${pageNum} ما فيها أعمال جديدة (لكيت ${all.length} رابط كلهم انسحبوا).`); break; }
+          printLog(`  📑 الصفحة ${pageNum}: ${mangaList.length} عمل جديد.`);
+          await runWorkerPool(mangaList, processSingleManga, 'سحب');
+
+          pageUrl = findNextPageUrl(pDoc, pageUrl, pageNum, profile);
+        } catch (pErr) {
+          markFailed(`صفحة أرشيف رقم ${pageNum} — ${pErr.message}`);
+          break;
+        }
+      }
+
+      document.getElementById('status').innerText = RUNNING ? "🎉 اكتمل السحب!" : "⛔ تم الإيقاف.";
+      RUNNING = false; setBusyUI(false);
+    }
+
+    // سحب روابط يدوية محددة بس
+    async function scrapeManualLinks() {
+      const raw = document.getElementById('manualLinks').value.trim();
+      if (!raw) { printLog('❌ ماكو روابط ملصوقة.'); return; }
+      const links = raw.split('\n')
+        .map(l => { const m = l.match(/https?:\/\/\S+/i); return m ? m[0].trim() : l.trim(); })
+        .filter(Boolean);
+      RUNNING = true; setBusyUI(true);
+      document.getElementById('status').innerText = `🔗 سحب ${links.length} رابط يدوي...`;
+      await requestWakeLock();
+      printLog(`🔗 بدء سحب ${links.length} رابط يدوي محدد...`);
+      await runWorkerPool(links, processSingleManga, 'رابط يدوي');
+      document.getElementById('status').innerText = "🎉 خلص السحب اليدوي!";
+      RUNNING = false; setBusyUI(false);
+    }
+
+    // ============================================================
+    // 🛠️ تعديل شامل — متوازي بالكامل
+    // ============================================================
+    async function runFixSystem() {
+      RUNNING = true; setBusyUI(true);
+      document.getElementById('status').innerText = "🛠️ التعديل شغال (متوازي)...";
+      printLog("\n🛠️ بدء نظام التعديل المتوازي...");
+
+      const allSnap = await getDocs(collection(db, "manhwa"));
+      const items = allSnap.docs.map(d => ({ id: d.id, data: d.data() }));
+      printLog(`📄 وجدت ${items.length} عمل.`);
+
+      const groups = new Map();
+      for (const it of items) {
+        const key = normalizeTitle(it.data.title) || normalizeTitle(it.data.sourceUrl);
+        if (!key) continue;
+        if (!groups.has(key)) groups.set(key, []);
+        groups.get(key).push(it);
+      }
+      const dupGroups = [...groups.values()].filter(g => g.length > 1);
+      printLog(`🔍 ${dupGroups.length} مجموعة مكررة (من أصل ${groups.size} عنوان فريد).`);
+
+      await runWorkerPool(dupGroups, async (group) => {
+        for (const it of group) {
+          const chapsSnap = await getDocs(collection(db, `manhwa/${it.id}/chapters`));
+          it.chapCount = chapsSnap.size;
+        }
+        group.sort((a, b) => b.chapCount - a.chapCount);
+        const keep = group[0];
+        for (const dupe of group.slice(1)) {
+          const chapsSnap = await getDocs(collection(db, `manhwa/${dupe.id}/chapters`));
+          for (const chDoc of chapsSnap.docs) await deleteDoc(doc(db, `manhwa/${dupe.id}/chapters`, chDoc.id));
+          await deleteDoc(doc(db, "manhwa", dupe.id));
+          dupeCount++; renderStats(); saveState();
+          printChange(`🗑️ حذف مكرر: "${dupe.data.title}" (${dupe.chapCount} فصل) — أبقيت نسخة بـ ${keep.chapCount} فصل`);
+        }
+      }, 'حذف تكرار');
+
+      const survivorsSnap = await getDocs(collection(db, "manhwa"));
+      const survivors = survivorsSnap.docs.map(d => ({ id: d.id, data: d.data() }));
+
+      await runWorkerPool(survivors, async (it) => {
+        if (!it.data.sourceUrl) return;
+        const updates = {};
+        const changes = [];
+
+        const ratingSuspect = it.data.rating === undefined || it.data.rating === null || it.data.rating === 8 || it.data.rating === 8.0;
+        const needsFetch = !it.data.description || ratingSuspect || !it.data.genres || it.data.genres.length === 0 || !it.data.cover || !it.data.status || it.data.status === 'مستمر';
+
+        let mDoc = null, rawHtml = null;
+        if (needsFetch) {
+          const result = await fetchViaProxy(it.data.sourceUrl);
+          mDoc = result.doc; rawHtml = result.raw;
+          if (!it.data.description) { const d = extractDescription(mDoc, rawHtml); if (d) { updates.description = d; changes.push('+قصة'); } }
+          if (ratingSuspect) { const r = extractRating(mDoc, rawHtml); if (r !== null && r !== it.data.rating) { updates.rating = r; changes.push(`تقييم ${it.data.rating ?? '؟'}→${r}`); } }
+          if (!it.data.genres || it.data.genres.length === 0) { const g = extractGenres(mDoc, rawHtml); if (g.length) { updates.genres = g; changes.push(`+${g.length} تصنيف`); } }
+          if (!it.data.cover) { const c = cleanUrl(mDoc.querySelector('meta[property="og:image"]')?.content || ''); if (c) { updates.cover = c; updates.coverUrl = c; updates.image = c; changes.push('+غلاف'); } }
+          const st = extractStatus(mDoc, rawHtml); if (st && st !== it.data.status) { updates.status = st; changes.push(`حالة→${st}`); }
+          if (!it.data.titleNormalized) updates.titleNormalized = normalizeTitle(it.data.title);
+          const cleanTitle = cleanSeriesTitle(it.data.title);
+          if (cleanTitle !== it.data.title) { updates.title = cleanTitle; changes.push('نظّف العنوان'); }
+        }
+
+        const chapsSnap = await getDocs(collection(db, `manhwa/${it.id}/chapters`));
+        const existingUrls = new Set();
+        let titlesFixed = 0, orderFixed = 0;
+        const chapDocs = chapsSnap.docs.map(d => ({ ref: d.ref, id: d.id, data: d.data() }));
+        chapDocs.forEach(c => { c._num = (typeof c.data.number === 'number' && !isNaN(c.data.number)) ? c.data.number : (parseFloat(c.id) || 0); });
+        chapDocs.sort((a, b) => a._num - b._num);
+
+        for (let idx = 0; idx < chapDocs.length; idx++) {
+          const c = chapDocs[idx];
+          existingUrls.add(c.data.sourceUrl);
+          const correctOrder = idx + 1;
+          const upd = {};
+          if (c.data.title !== undefined) { upd.title = deleteField(); titlesFixed++; }
+          if (c.data.order !== correctOrder) { upd.order = correctOrder; orderFixed++; }
+          if (Object.keys(upd).length > 0) await updateDoc(doc(db, `manhwa/${it.id}/chapters`, c.id), upd);
+
+          if ((!c.data.images || c.data.images.length === 0) && !c.data.content) {
+            try {
+              const { doc: chPageDoc, raw: chPageRaw } = await fetchViaProxy(c.data.sourceUrl);
+              const { isNovel, images, content } = await extractChapterContent(chPageDoc, chPageRaw);
+              if (images.length > 0 || content.length > 0) {
+                await updateDoc(doc(db, `manhwa/${it.id}/chapters`, c.id), { isNovel, images, content });
+                if (isNovel) { novelChapCount++; renderStats(); }
+                changes.push('أصلح فصل فاضي');
+              }
+            } catch (e) {}
+          }
+        }
+        if (titlesFixed > 0) changes.push(`شال كلمة/رقم من ${titlesFixed} فصل`);
+        if (orderFixed > 0) changes.push(`صحّح ترتيب ${orderFixed} فصل`);
+
+        if (!mDoc) { const result = await fetchViaProxy(it.data.sourceUrl); mDoc = result.doc; }
+        const allChaps = extractChapterLinks(mDoc, it.data.sourceUrl);
+        const newChaps = sortChaptersByNumber(allChaps.filter(c => !existingUrls.has(c.url)));
+        for (let j = 0; j < newChaps.length; j++) {
+          if (!RUNNING) break;
+          const ch = newChaps[j];
+          const chNum = cleanChapterNumber(ch.txt, chapsSnap.size + j + 1);
+          const correctOrder = chapsSnap.size + j + 1;
+          try {
+            const { doc: chDocPage, raw: chPageRaw2 } = await fetchViaProxy(ch.url);
+            const { isNovel, images, content } = await extractChapterContent(chDocPage, chPageRaw2);
+            if (images.length > 0 || content.length > 0) {
+              await setDoc(doc(db, `manhwa/${it.id}/chapters`, chNum), {
+                number: parseFloat(chNum) || correctOrder,
+                sourceUrl: ch.url, isNovel, images, content, order: correctOrder
+              });
+              chapCount++; if (isNovel) novelChapCount++;
+              renderStats(); saveState();
+            }
+          } catch (e) { markFailed(`فصل جديد: ${ch.url} — ${e.message}`); }
+        }
+        if (newChaps.length > 0) changes.push(`+${newChaps.length} فصل جديد`);
+
+        if (Object.keys(updates).length > 0) {
+          updates.updatedAt = serverTimestamp();
+          await updateDoc(doc(db, "manhwa", it.id), updates);
+        }
+        if (changes.length > 0) {
+          fixedCount++; renderStats(); saveState();
+          printChange(`🔧 ${it.data.title}: ${changes.join('، ')}`);
+        }
+      }, 'إصلاح');
+
+      document.getElementById('status').innerText = RUNNING ? `🎉 التعديل خلص — ${dupeCount} مكرر محذوف، ${fixedCount} عمل مصلّح.` : "⛔ تم الإيقاف.";
+      RUNNING = false; setBusyUI(false);
+    }
+
+    // ============================================================
+    // 🆕 فحص فصول جديدة فقط
+    // ============================================================
+    async function checkNewChaptersOnly() {
+      RUNNING = true; setBusyUI(true);
+      document.getElementById('status').innerText = "🆕 يفحص فصول جديدة (متوازي)...";
+      printLog('\n🆕 بدء فحص الفصول الجديدة فقط...');
+
+      const allSnap = await getDocs(collection(db, "manhwa"));
+      const items = allSnap.docs.map(d => ({ id: d.id, data: d.data() }));
+
+      await runWorkerPool(items, async (it) => {
+        if (!it.data.sourceUrl) return;
+        const chapsSnap = await getDocs(collection(db, `manhwa/${it.id}/chapters`));
+        const existingUrls = new Set(chapsSnap.docs.map(c => c.data().sourceUrl));
+
+        const { doc: mDoc } = await fetchViaProxy(it.data.sourceUrl);
+        const allChaps = extractChapterLinks(mDoc, it.data.sourceUrl);
+        const newChaps = sortChaptersByNumber(allChaps.filter(c => !existingUrls.has(c.url)));
+        if (newChaps.length === 0) return;
+
+        for (let j = 0; j < newChaps.length; j++) {
+          if (!RUNNING) break;
+          const ch = newChaps[j];
+          const chNum = cleanChapterNumber(ch.txt, chapsSnap.size + j + 1);
+          const correctOrder = chapsSnap.size + j + 1;
+          try {
+            const { doc: chDocPage, raw: chPageRaw2 } = await fetchViaProxy(ch.url);
+            const { isNovel, images, content } = await extractChapterContent(chDocPage, chPageRaw2);
+            if (images.length > 0 || content.length > 0) {
+              await setDoc(doc(db, `manhwa/${it.id}/chapters`, chNum), {
+                number: parseFloat(chNum) || correctOrder,
+                sourceUrl: ch.url, isNovel, images, content, order: correctOrder
+              });
+              chapCount++; if (isNovel) novelChapCount++;
+              renderStats(); saveState();
+            }
+          } catch (e) { markFailed(`فصل جديد: ${ch.url} — ${e.message}`); }
+        }
+        printChange(`🆕 ${it.data.title}: +${newChaps.length} فصل جديد`);
+      }, 'فصول جديدة');
+
+      document.getElementById('status').innerText = "🎉 خلص فحص الفصول الجديدة.";
+      RUNNING = false; setBusyUI(false);
+    }
+
+    // ============================================================
+    // 🩺 فحص شامل: يمر على كل مرحلة (بروكسي ← أرشيف ← مانهوا ← فصل ← قاعدة بيانات)
+    // ويطلع تقرير قصير جاهز للنسخ — حتى ما تنسخ سجلات طويلة
+    // ============================================================
+    async function runSelfTest() {
+      const btn = document.getElementById('selfTestBtn');
+      const box = document.getElementById('reportBox');
+      btn.disabled = true; box.value = '';
+      REPORT = [];
+      const say = (t) => printLog(t);
+      try {
+        say('🩺 ===== بدء الفحص الشامل =====');
+        const profile = getActiveProfile();
+        let firstSeries = null;
+
+        // 1) البروكسي
+        try {
+          const ctl = new AbortController(); const tid = setTimeout(() => ctl.abort(), 8000);
+          const r = await fetch('http://127.0.0.1:8080/', { cache: 'no-store', signal: ctl.signal });
+          clearTimeout(tid);
+          const t = await r.text();
+          say(`1️⃣ البروكسي: ${r.ok ? '✅ شغال' : '❌ رد ' + r.status} — ${t.slice(0, 40)}`);
+        } catch (e) { say(`1️⃣ البروكسي: ❌ ما رد (${e.message}) — تأكد إن تطبيق البروكسي مفتوح`); }
+
+        // 2) الأرشيف
+        try {
+          const { doc: pDoc, raw: pRaw } = await fetchViaProxy(profile.baseUrl);
+          const list = extractSeriesLinks(pDoc, pRaw, profile.baseUrl, profile);
+          say(`2️⃣ الأرشيف: ${list.length ? '✅' : '❌'} لكيت ${list.length} مانهوا بالصفحة الأولى`);
+          list.slice(0, 2).forEach(u => say(`     ${u}`));
+          say(`     الصفحة التالية راح يجربها: ${findNextPageUrl(pDoc, profile.baseUrl, 1, profile)}`);
+          if (list.length) firstSeries = list[0];
+        } catch (e) { say(`2️⃣ الأرشيف: ❌ ${e.message}`); }
+
+        // 3) مانهوا (الرابط الملصوق بخانة الروابط اليدوية، وإلا أول مانهوا من الأرشيف)
+        const mm = document.getElementById('manualLinks').value.match(/https?:\/\/\S+/i);
+        const seriesUrl = (mm && mm[0]) || firstSeries || 'https://azorafly.com/series/shadow-slave';
+        let chapters = [];
+        try {
+          const { doc: mDoc, raw } = await fetchViaProxy(seriesUrl);
+          const title = cleanSeriesTitle(mDoc.querySelector('meta[property="og:title"]')?.content || mDoc.title || '');
+          const rating = extractRating(mDoc, raw), genres = extractGenres(mDoc, raw);
+          const status = extractStatus(mDoc, raw), desc = extractDescription(mDoc, raw);
+          chapters = sortChaptersByNumber(extractChapterLinks(mDoc, seriesUrl));
+          const hint = extractChapterCountHint(raw);
+          say(`3️⃣ المانهوا: ${seriesUrl}`);
+          say(`     عنوان: ${title || '❌'} | قصة: ${desc ? desc.length + ' حرف' : '❌'} | تقييم: ${rating ?? '❌'} | حالة: ${status || '❌'}`);
+          say(`     تصنيفات: ${genres.length ? genres.join('، ') : '❌'}`);
+          say(`     فصول: ${chapters.length} ${chapters.length ? '✅' : '❌'}${hint !== null ? ' (العدد الحقيقي حسب الموقع: ' + hint + ')' : ''}`);
+        } catch (e) { say(`3️⃣ المانهوا: ❌ ${e.message}`); }
+
+        // 4) أول فصل
+        if (chapters.length) {
+          const ch = chapters[0];
+          try {
+            const { doc: chDoc, raw: chRaw } = await fetchViaProxy(ch.url);
+            const res = await extractChapterContent(chDoc, chRaw);
+            const ok = res.images.length > 0 || res.content.length > 0;
+            say(`4️⃣ أول فصل: ${ok ? '✅' : '❌'} ${res.isNovel ? 'رواية — حروف: ' + res.content.length : 'صور: ' + res.images.length}  (${ch.url})`);
+            if (res.images[0]) say(`     أول صورة: ${res.images[0].slice(0, 100)}`);
+            if (!ok) await diagnoseChapter(ch.url, chDoc, chRaw);
+          } catch (e) { say(`4️⃣ أول فصل: ❌ ${e.message}`); }
+        } else {
+          say('4️⃣ أول فصل: ⏭️ تخطيت (ماكو فصول ملقوطة)');
+        }
+
+        // 5) قاعدة البيانات
+        try {
+          const ref = doc(db, 'manhwa', '_selftest');
+          await withTimeout(setDoc(ref, { t: serverTimestamp(), note: 'self test' }), 15000, 'كتابة تجريبية');
+          const back = await withTimeout(getDoc(ref), 15000, 'قراءة تجريبية');
+          await withTimeout(deleteDoc(ref), 15000, 'حذف تجريبي');
+          say(`5️⃣ قاعدة البيانات: ${back.exists() ? '✅ كتابة + قراءة + حذف تمام' : '❌ انكتبت بس ما انقرت'}`);
+        } catch (e) { say(`5️⃣ قاعدة البيانات: ❌ ${e.message}`); }
+
+        say('🩺 ===== انتهى الفحص =====');
+      } finally {
+        const text = (REPORT || []).join('\n');
+        REPORT = null;
+        box.value = text;
+        btn.disabled = false;
+        try { await navigator.clipboard.writeText(text); printLog('📋 انتسخ التقرير للحافظة — الصقه بالشات.'); } catch (e) { printLog('📋 التقرير بالمربع فوق — اضغط "نسخ التقرير".'); }
+      }
+    }
+    function copyReport() {
+      const box = document.getElementById('reportBox');
+      if (!box.value) { printLog('❌ ماكو تقرير بعد — اضغط 🩺 أول.'); return; }
+      box.removeAttribute('readonly'); box.select(); box.setSelectionRange(0, 999999);
+      let ok = false;
+      try { ok = document.execCommand('copy'); } catch (e) {}
+      box.setAttribute('readonly', 'readonly');
+      if (!ok && navigator.clipboard) navigator.clipboard.writeText(box.value).then(() => printLog('📋 انتسخ.'), () => {});
+      printLog(ok ? '📋 انتسخ التقرير.' : '📋 إذا ما انتسخ: اضغط مطولاً بالمربع واختر نسخ.');
+    }
+
+    function stopCurrentProcess() {
+      RUNNING = false;
+      document.getElementById('status').innerText = "⏳ جاري الإيقاف... (العمال الحاليين يخلصون شغلهم أول)";
+      document.getElementById('stopBtn').disabled = true;
+    }
+    function resetMemory() {
+      if (!confirm('متأكد؟ هذا يمسح الإحصائيات والسجلات المحفوظة بهذا المتصفح (ما يمسح قاعدة البيانات ولا إعدادات المواقع).')) return;
+      localStorage.removeItem(STORE_KEY);
+      location.reload();
+    }
+    function saveNewSite() {
+      const domain = document.getElementById('newSiteDomain').value.trim();
+      const base = document.getElementById('newSiteBase').value.trim();
+      const jsonText = document.getElementById('newSiteJson').value.trim();
+      if (!domain || !base || !jsonText) { printLog('❌ لازم تملي الثلاث حقول: النطاق، الرابط الأساسي، وإعدادات JSON.'); return; }
+      let parsed;
+      try { parsed = JSON.parse(jsonText); } catch (e) { printLog('❌ صيغة JSON غلط: ' + e.message); return; }
+      parsed.baseUrl = base;
+      const profiles = loadCustomProfiles();
+      profiles[domain] = parsed;
+      saveCustomProfiles(profiles);
+      populateSiteSelect();
+      document.getElementById('siteSelect').value = domain;
+      printLog(`✅ انحفظ موقع جديد: ${domain}`);
+    }
+    function deleteCurrentSite() {
+      const domain = document.getElementById('siteSelect').value;
+      if (BUILTIN_PROFILES[domain]) { printLog('❌ ما تكدر تحذف موقع أساسي (azorafly.com).'); return; }
+      if (!confirm(`متأكد تحذف إعدادات ${domain}؟`)) return;
+      const profiles = loadCustomProfiles();
+      delete profiles[domain];
+      saveCustomProfiles(profiles);
+      populateSiteSelect();
+      printLog(`🗑️ حذفت موقع: ${domain}`);
+    }
+
+    document.getElementById('startBtn').addEventListener('click', startArchiveScraping);
+    document.getElementById('stopBtn').addEventListener('click', stopCurrentProcess);
+    document.getElementById('resetBtn').addEventListener('click', resetMemory);
+    document.getElementById('selfTestBtn').addEventListener('click', () => runSelfTest().catch(e => { printLog('❌ ' + e.message); REPORT = null; document.getElementById('selfTestBtn').disabled = false; }));
+    document.getElementById('copyReportBtn').addEventListener('click', copyReport);
+    document.getElementById('diagBtn').addEventListener('click', () => diagnoseUrl().catch(e => printLog('❌ ' + e.message)));
+    document.getElementById('saveSiteBtn').addEventListener('click', saveNewSite);
+    document.getElementById('deleteSiteBtn').addEventListener('click', deleteCurrentSite);
+    document.getElementById('manualScrapeBtn').addEventListener('click', () => {
+      scrapeManualLinks().catch(e => { printLog('❌ ' + e.message); RUNNING = false; setBusyUI(false); });
+    });
+    document.getElementById('fixBtn').addEventListener('click', () => {
+      runFixSystem().catch(e => { printLog(`❌ خطأ عام بالتعديل: ${e.message}`); RUNNING = false; setBusyUI(false); });
+    });
+    document.getElementById('newChapBtn').addEventListener('click', () => {
+      checkNewChaptersOnly().catch(e => { printLog(`❌ خطأ: ${e.message}`); RUNNING = false; setBusyUI(false); });
+    });
+  </script>
+</body>
+</html>
